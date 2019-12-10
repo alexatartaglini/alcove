@@ -4,8 +4,10 @@ import torch.optim as optim
 import numpy as np
 import matplotlib.pyplot as plt    
 from itertools import permutations
-from data_loader import get_label_coding,load_shj_abstract,load_shj_images
+from data_loader import get_label_coding,load_shj_abstract,load_shj_images, get_imageset
 from scipy.stats import sem
+from convnet_feat import get_model 
+from os import mkdir
 
 #
 # PyTorch implementation of
@@ -258,9 +260,54 @@ if __name__ == "__main__":
 			plt.errorbar(M[i,0,:],M[i,1,:],yerr=SE[i,1,:],linewidth=4./(i+1))
 		else:
 			plt.plot(M[i,0,:],M[i,1,:],linewidth=4./(i+1))
+	
+	title = ''
+	file_dir = 'plots/' 
+	
+	if data_type == 'images':
+		file_dir += get_imageset() + '/'
+		subdir_name = 'plots/' + get_imageset() 
+	elif data_type == 'abstract':
+		file_dir += 'abstract/'
+		subdir_name = 'plots/abstract'
+		
+	model_string = get_model()
+	
+	if model_type == 'alcove':
+		title += 'ALCOVE Model: '
+		file_dir += 'alcove_'
+	elif model_type == 'mlp':
+		title += 'MLP Model: '
+		file_dir += 'mlp_'
+	if data_type == 'abstract':
+		title += 'Abstract Stimulus, '
+		file_dir += 'ab_'
+	elif data_type == 'images':
+		title += 'Image Stimulus ' + '(' + model_string + '), '
+		file_dir += 'im_' + model_string + '_'
+	if loss_type == 'hinge':
+		title += 'Hinge Loss'
+		file_dir += 'hinge'
+	elif loss_type == 'll':
+		title += 'Log-Likelihood Loss'
+		file_dir += 'll'
+	
+	dir_name = 'plots'
+	
+	try:
+		mkdir(dir_name)
+	except FileExistsError:
+		pass
+	try:
+		mkdir(subdir_name)
+	except FileExistsError:
+		pass		
+					
+	plt.suptitle(title)
 	plt.xlabel('Block')
 	plt.ylabel('Probability correct')
 	plt.legend(["Type " + str(s) for s in range(1,7)])
+	plt.savefig(file_dir + '1.png')
 	
 	plt.figure(2)
 	for i in range(ntype):
@@ -268,7 +315,10 @@ if __name__ == "__main__":
 			plt.errorbar(M[i,0,:],M[i,3,:],yerr=SE[i,3,:],linewidth=4./(i+1))  # v is [tracker type x n_iters]
 		else:
 			plt.plot(M[i,0,:],M[i,3,:],linewidth=4./(i+1))  # v is [tracker type x n_iters]
+	
+	plt.suptitle(title)
 	plt.xlabel('epoch')
 	plt.ylabel('loss')
 	plt.legend(["Type " + str(s) for s in range(1,7)])
+	plt.savefig(file_dir + '2.png')
 	plt.show()
