@@ -18,6 +18,8 @@ from scipy.spatial.distance import euclidean,cosine
 
 use_gpu = torch.cuda.is_available()
 
+model_string = ''
+
 # Image normalization (all pre-trained models use the same normalization)
 T = transforms.Compose([
     transforms.Scale(224),
