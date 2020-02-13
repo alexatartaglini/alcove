@@ -94,6 +94,9 @@ def get_features(data_dir,model_type):
     elif model_type == 'vgg11':
         model = torchvision.models.vgg11(pretrained=True)
         model.classifier = Identity() # keep just the top conv layer
+    elif model_type == 'inception_v3': # added
+	    model = torchvision.models.inception_v3(pretrained=True)  
+	    model.fc = Identity()
     else:
         assert False
     if use_gpu:

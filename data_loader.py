@@ -52,7 +52,7 @@ def load_shj(loss_type):
 def process_shj_images():
 	# Return
 	#  X : [ne x dim tensor] stimuli as rows
-	mydir = 'data/shj_images_set1'
+	mydir = 'data/shj_images_set3_resize'
 	# mydir = 'data/shj_images_set2'
 	
 	global imageset_string 
@@ -60,7 +60,7 @@ def process_shj_images():
 	
 	print(" Passing SHJ images through ConvNet...")
 	# stimuli,images = get_features(mydir,'vgg11')
-	stimuli,images = get_features(mydir,'resnet18')
+	stimuli,images = get_features(mydir,'vgg11')
 
 	print(" Done.")
 	stimuli = stimuli.cpu().data.numpy().astype(float)
