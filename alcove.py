@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 from itertools import permutations
 from data_loader import get_label_coding,load_shj_abstract,load_shj_images, get_imageset
 from scipy.stats import sem
-#from convnet_feat import get_model 
 from os import mkdir
+import pandas as pd
 
 #
 # PyTorch implementation of
@@ -150,7 +150,7 @@ def HingeLoss(output, target):
     hinge_loss[hinge_loss < 0] = 0.
     return torch.sum(hinge_loss)
 
-def train(exemplars,labels,num_epochs,loss_type,track_inc=5,verbose_params=False):
+def train(exemplars,labels,num_epochs,loss_type,column_index,track_inc=5,verbose_params=False):
 	# Train model on a SHJ problem
 	# 
 	# Input
@@ -197,6 +197,7 @@ def train(exemplars,labels,num_epochs,loss_type,track_inc=5,verbose_params=False
 			v_acc.append(test_acc)
 			v_prob.append(test_prob)
 			print('  epoch ' + str(epoch) + "; train loss " + str(round(v_loss[-1],4)))
+			df.at[epoch, types[column_index]] = round(v_loss[-1],4)
 
 	if model_type == 'alcove' and verbose_params:
 		print("Attention weights:")
@@ -209,15 +210,20 @@ def train(exemplars,labels,num_epochs,loss_type,track_inc=5,verbose_params=False
 
 if __name__ == "__main__":
 	
+	# If no command line arguments are passed in, these settings run
 	default_settings = ["alcove", "abstract", "resnet18", "hinge"]
 	
 	parser = argparse.ArgumentParser()
-	parser.add_argument("-m", "--model_type",type=str,help="'alcove' or 'mlp'")
-	parser.add_argument("-im","--image_set",help="directory of image set OR 'abstract'")
+	parser.add_argument("-m", "--model_type",type=str,help="'alcove' or 'mlp'. " +
+					 "Default is " + default_settings[0])
+	parser.add_argument("-im","--image_set",help="directory of image set OR 'abstract'. "
+					 + "Default is " + default_settings[1])
 	parser.add_argument("-net","--net_type",type=str, 
-					 help="'vgg11', 'resnet18', 'resnet152', etc.")
-	parser.add_argument("-l", "--loss",type=str,help="'hinge' or 'll'")
-	parser.add_argument("-p","--plot",help="save data as a plot",
+					 help="'vgg11', 'resnet18', 'resnet152', etc. Default is " +
+					 default_settings[2])
+	parser.add_argument("-l", "--loss",type=str,help="'hinge' or 'll'. Default is "
+					 + default_settings[3])
+	parser.add_argument("-p","--plot",help="save data as a plot. Default = false",
 					 action="store_true")
 	args = parser.parse_args()
 	
@@ -269,6 +275,13 @@ if __name__ == "__main__":
 		assert False
 	dim = list_exemplars[0].size(1)
 	print("Data loaded with " + str(dim) + " dimensions.")
+	
+	#global df
+	epoch_range = list(range(5,num_epochs+1,5))
+	epoch_range.insert(0,1)
+	df = pd.DataFrame(index=epoch_range, 
+				   columns=['Type I','Type II','Type III','Type IV','Type V','Type VI'])
+	types = ['Type I','Type II','Type III','Type IV','Type V','Type VI']
 
 	# Run ALCOVE on each SHJ problem
 	list_trackers = []
@@ -278,22 +291,12 @@ if __name__ == "__main__":
 		for mytype in range(1,ntype+1): # from type I to type VI
 			print('  Training on type ' + str(mytype))
 			labels = labels_by_type[mytype-1]
-			v_epoch,v_prob,v_acc,v_loss = train(exemplars,labels,num_epochs,loss_type)
+			v_epoch,v_prob,v_acc,v_loss = train(exemplars,labels,num_epochs,loss_type,mytype-1)
 			tracker.append((v_epoch,v_prob,v_acc,v_loss))
 			print("")
 		list_trackers.append(tracker)
-
-	A = np.array(list_trackers) # nperms x ntype x 4 tracker types x n_iters
-	M = np.mean(A,axis=0) # ntype x 4 tracker types x n_iters
-	SE = sem(A,axis=0) # ntype x 4 tracker types x n_iters
-
-	plt.figure(1)
-	for i in range(ntype): 
-		if viz_se:
-			plt.errorbar(M[i,0,:],M[i,1,:],yerr=SE[i,1,:],linewidth=4./(i+1))
-		else:
-			plt.plot(M[i,0,:],M[i,1,:],linewidth=4./(i+1))
 	
+	# Create directories/filenames for plots/csv files and title for plots
 	title = ''
 	if(args.plot):
 		file_dir = 'plots/' 
@@ -312,9 +315,7 @@ if __name__ == "__main__":
 			subdir_name = 'plots/abstract'
 		else:
 			subdir_name = 'csv/abstract'
-		
-	#model_string = get_model()
-	
+
 	if model_type == 'alcove':
 		title += 'ALCOVE Model: '
 		file_dir += 'alcove_'
@@ -325,8 +326,6 @@ if __name__ == "__main__":
 		title += 'Abstract Stimulus, '
 		file_dir += 'ab_'
 	elif data_type == 'images':
-		#title += 'Image Stimulus ' + '(' + model_string + '), '
-		#file_dir += 'im_' + model_string + '_'
 		title += 'Image Stimulus ' + '(' + net_type + '), '
 		file_dir += 'im_' + net_type + '_'
 	if loss_type == 'hinge':
@@ -348,24 +347,38 @@ if __name__ == "__main__":
 	try:
 		mkdir(subdir_name)
 	except FileExistsError:
-		pass		
-					
-	plt.suptitle(title)
-	plt.xlabel('Block')
-	plt.ylabel('Probability correct')
-	plt.legend(["Type " + str(s) for s in range(1,7)])
-	plt.savefig(file_dir + '1.png')
-	
-	plt.figure(2)
-	for i in range(ntype):
-		if viz_se:
-			plt.errorbar(M[i,0,:],M[i,3,:],yerr=SE[i,3,:],linewidth=4./(i+1))  # v is [tracker type x n_iters]
-		else:
-			plt.plot(M[i,0,:],M[i,3,:],linewidth=4./(i+1))  # v is [tracker type x n_iters]
-	
-	plt.suptitle(title)
-	plt.xlabel('epoch')
-	plt.ylabel('loss')
-	plt.legend(["Type " + str(s) for s in range(1,7)])
-	plt.savefig(file_dir + '2.png')
-	plt.show()
+		pass
+
+	if(args.plot):
+		A = np.array(list_trackers) # nperms x ntype x 4 tracker types x n_iters
+		M = np.mean(A,axis=0) # ntype x 4 tracker types x n_iters
+		SE = sem(A,axis=0) # ntype x 4 tracker types x n_iters		
+		
+		plt.figure(1)
+		for i in range(ntype): 
+			if viz_se:
+				plt.errorbar(M[i,0,:],M[i,1,:],yerr=SE[i,1,:],linewidth=4./(i+1))
+			else:
+				plt.plot(M[i,0,:],M[i,1,:],linewidth=4./(i+1))
+						
+		plt.suptitle(title)
+		plt.xlabel('Block')
+		plt.ylabel('Probability correct')
+		plt.legend(["Type " + str(s) for s in range(1,7)])
+		plt.savefig(file_dir + '1.png')
+		
+		plt.figure(2)
+		for i in range(ntype):
+			if viz_se:
+				plt.errorbar(M[i,0,:],M[i,3,:],yerr=SE[i,3,:],linewidth=4./(i+1))  # v is [tracker type x n_iters]
+			else:
+				plt.plot(M[i,0,:],M[i,3,:],linewidth=4./(i+1))  # v is [tracker type x n_iters]
+		
+		plt.suptitle(title)
+		plt.xlabel('epoch')
+		plt.ylabel('loss')
+		plt.legend(["Type " + str(s) for s in range(1,7)])
+		plt.savefig(file_dir + '2.png')
+		plt.show()
+	else:
+		df.to_csv(file_dir + '.csv')

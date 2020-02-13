@@ -144,9 +144,6 @@ def similarity_gradient(data_dir,model_type,idx_sel=0,dist_type='euclidean'):
         imshow(img_choices[j])
         plt.title('dist='+str(dist[j]))
     plt.show()
-	
-#def get_model():
-	#return model_string
 
 if __name__ == "__main__":
     similarity_gradient('data','vgg11')
