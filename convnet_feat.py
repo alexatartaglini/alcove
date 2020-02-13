@@ -64,8 +64,8 @@ def get_features(data_dir,model_type):
     #   output : [nimg x nfeat tensor] returns extracted features, with each image as a row
     #   images : [nimg x 3 x 224 x 224 tensor] raw images
 
-    global model_string
-    model_string = model_type
+    #global model_string
+    #model_string = model_type
 		
     # Process the input data
     image_dataset = datasets.ImageFolder(data_dir, T)
@@ -145,8 +145,8 @@ def similarity_gradient(data_dir,model_type,idx_sel=0,dist_type='euclidean'):
         plt.title('dist='+str(dist[j]))
     plt.show()
 	
-def get_model():
-	return model_string
+#def get_model():
+	#return model_string
 
 if __name__ == "__main__":
     similarity_gradient('data','vgg11')

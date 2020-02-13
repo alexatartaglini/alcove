@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from itertools import permutations
 from data_loader import get_label_coding,load_shj_abstract,load_shj_images, get_imageset
 from scipy.stats import sem
-from convnet_feat import get_model 
+#from convnet_feat import get_model 
 from os import mkdir
 
 #
@@ -295,16 +295,25 @@ if __name__ == "__main__":
 			plt.plot(M[i,0,:],M[i,1,:],linewidth=4./(i+1))
 	
 	title = ''
-	file_dir = 'plots/' 
+	if(args.plot):
+		file_dir = 'plots/' 
+	else:
+		file_dir = 'csv/'
 	
 	if data_type == 'images':
 		file_dir += get_imageset() + '/'
-		subdir_name = 'plots/' + get_imageset() 
+		if(args.plot):
+			subdir_name = 'plots/' + get_imageset() 
+		else:
+			subdir_name = 'csv/' + get_imageset()
 	elif data_type == 'abstract':
 		file_dir += 'abstract/'
-		subdir_name = 'plots/abstract'
+		if(args.plot):
+			subdir_name = 'plots/abstract'
+		else:
+			subdir_name = 'csv/abstract'
 		
-	model_string = get_model()
+	#model_string = get_model()
 	
 	if model_type == 'alcove':
 		title += 'ALCOVE Model: '
@@ -316,8 +325,10 @@ if __name__ == "__main__":
 		title += 'Abstract Stimulus, '
 		file_dir += 'ab_'
 	elif data_type == 'images':
-		title += 'Image Stimulus ' + '(' + model_string + '), '
-		file_dir += 'im_' + model_string + '_'
+		#title += 'Image Stimulus ' + '(' + model_string + '), '
+		#file_dir += 'im_' + model_string + '_'
+		title += 'Image Stimulus ' + '(' + net_type + '), '
+		file_dir += 'im_' + net_type + '_'
 	if loss_type == 'hinge':
 		title += 'Hinge Loss'
 		file_dir += 'hinge'
@@ -325,7 +336,10 @@ if __name__ == "__main__":
 		title += 'Log-Likelihood Loss'
 		file_dir += 'll'
 	
-	dir_name = 'plots'
+	if(args.plot):
+		dir_name = 'plots'
+	else:
+		dir_name = 'csv'
 	
 	try:
 		mkdir(dir_name)
