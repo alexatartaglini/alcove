@@ -49,18 +49,18 @@ def load_shj(loss_type):
 		y_list.append(y)
 	return X,y_list
 
-def process_shj_images():
+def process_shj_images(net_type, im_dir):
 	# Return
 	#  X : [ne x dim tensor] stimuli as rows
-	mydir = 'data/shj_images_set3_resize'
+	#mydir = 'data/shj_images_set3_resize'
 	# mydir = 'data/shj_images_set2'
 	
 	global imageset_string 
-	imageset_string = mydir[5:]
+	imageset_string = im_dir[5:]
 	
 	print(" Passing SHJ images through ConvNet...")
 	# stimuli,images = get_features(mydir,'vgg11')
-	stimuli,images = get_features(mydir,'vgg11')
+	stimuli,images = get_features(im_dir,net_type)
 
 	print(" Done.")
 	stimuli = stimuli.cpu().data.numpy().astype(float)
@@ -94,7 +94,7 @@ def load_shj_abstract(loss_type, perm=[0,1,2]):
 	X = X[perm_idx,:] # permute items from original order to permuted order
 	return X,y_list
 
-def load_shj_images(loss_type, perm=[0,1,2], viz_cats=False):
+def load_shj_images(loss_type, net_type, im_dir, perm=[0,1,2], viz_cats=False):
 	# Loads SHJ data from images
 	# 
 	# Input
@@ -106,7 +106,7 @@ def load_shj_images(loss_type, perm=[0,1,2], viz_cats=False):
 	#   y_list : list of [ne tensor] labels, with a list element for each shj type
 	
 	# load image and abstract data
-	X,images = process_shj_images()
+	X,images = process_shj_images(net_type,im_dir)
 	X_abstract,y_list = load_shj(loss_type)
 	X_abstract = X_abstract.data.numpy().astype(int)
 

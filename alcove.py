@@ -1,3 +1,4 @@
+import argparse
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -207,11 +208,43 @@ def train(exemplars,labels,num_epochs,loss_type,track_inc=5,verbose_params=False
 	return v_epoch,v_prob,v_acc,v_loss
 
 if __name__ == "__main__":
+	
+	default_settings = ["alcove", "abstract", "resnet18", "hinge"]
+	
+	parser = argparse.ArgumentParser()
+	parser.add_argument("-m", "--model_type",type=str,help="'alcove' or 'mlp'")
+	parser.add_argument("-im","--image_set",help="directory of image set OR 'abstract'")
+	parser.add_argument("-net","--net_type",type=str, 
+					 help="'vgg11', 'resnet18', 'resnet152', etc.")
+	parser.add_argument("-l", "--loss",type=str,help="'hinge' or 'll'")
+	parser.add_argument("-p","--plot",help="save data as a plot",
+					 action="store_true")
+	args = parser.parse_args()
+	
+	num_epochs = 50 # number of passes through exemplars
 
-	num_epochs = 200 # number of passes through exemplars
-	model_type = 'mlp' # 'alcove' or 'mlp'
-	data_type = 'images' # 'abstract' (binary representation) or 'images' (pixels)
-	loss_type = 'hinge' # 'll' (log-likelihood) or 'hinge' (version of humble teacher)
+	if(args.model_type is None):
+		model_type = default_settings[0]
+	else:
+		model_type = args.model_type
+	#data_type = 'images' # 'abstract' (binary representation) or 'images' (pixels)
+	if(args.image_set == 'abstract'):
+		data_type = 'abstract'
+	elif(args.image_set is None):
+		data_type = default_settings[1]
+	else:
+		data_type = 'images'
+		im_dir = args.image_set
+		if(args.net_type is None):
+			net_type = default_settings[2]
+		else:
+			net_type = args.net_type
+	
+	#loss_type = 'hinge' # 'll' (log-likelihood) or 'hinge' (version of humble teacher)
+	if(args.loss is None):
+		loss_type = default_settings[3]
+	else:
+		loss_type = args.loss
 	lr_association = 0.03 # learning rate for association weights
 	lr_attn = 0.0033 # learning rate for attention weights
 	ntype = 6 # number of types in SHJ
@@ -229,7 +262,7 @@ if __name__ == "__main__":
 		list_perms = list(permutations([0,1,2])) # ways of assigning abstract dimensions to visual ones
 		list_exemplars = []
 		for p in list_perms:
-			exemplars,labels_by_type = load_shj_images(loss_type,p)
+			exemplars,labels_by_type = load_shj_images(loss_type,net_type,im_dir,p)
 				# [n_exemplars x dim tensor],list of [n_exemplars tensor]
 			list_exemplars.append(exemplars)
 	else:
