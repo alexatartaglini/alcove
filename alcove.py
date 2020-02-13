@@ -150,7 +150,7 @@ def HingeLoss(output, target):
     hinge_loss[hinge_loss < 0] = 0.
     return torch.sum(hinge_loss)
 
-def train(exemplars,labels,num_epochs,loss_type,column_index,track_inc=5,verbose_params=False):
+def train(exemplars,labels,num_epochs,loss_type,typenum,track_inc=5,verbose_params=False):
 	# Train model on a SHJ problem
 	# 
 	# Input
@@ -170,8 +170,11 @@ def train(exemplars,labels,num_epochs,loss_type,column_index,track_inc=5,verbose
 		net = MLP()
 	elif model_type == 'alcove':
 		net = ALCOVE(exemplars)
+		df.at[type_tracker:type_tracker+num_rows,'c'] = net.c
 	else:
 		assert False
+		
+	df.at[type_tracker:type_tracker+num_rows,'phi'] = net.phi
 
 	if loss_type == 'll':
 		loss = torch.nn.BCEWithLogitsLoss(reduction='sum')
@@ -197,7 +200,9 @@ def train(exemplars,labels,num_epochs,loss_type,column_index,track_inc=5,verbose
 			v_acc.append(test_acc)
 			v_prob.append(test_prob)
 			print('  epoch ' + str(epoch) + "; train loss " + str(round(v_loss[-1],4)))
-			df.at[epoch, types[column_index]] = round(v_loss[-1],4)
+			df.at[epoch//track_inc+type_tracker, 'Train Loss'] = round(v_loss[-1],4)
+			df.at[epoch//track_inc+type_tracker, 'Train Accuracy'] = round(v_acc[-1],4)
+			df.at[epoch//track_inc+type_tracker, 'Epoch'] = epoch
 
 	if model_type == 'alcove' and verbose_params:
 		print("Attention weights:")
@@ -228,6 +233,7 @@ if __name__ == "__main__":
 	args = parser.parse_args()
 	
 	num_epochs = 50 # number of passes through exemplars
+	track_inc = 5 # step size for recording epochs 
 
 	if(args.model_type is None):
 		model_type = default_settings[0]
@@ -255,7 +261,25 @@ if __name__ == "__main__":
 	lr_attn = 0.0033 # learning rate for attention weights
 	ntype = 6 # number of types in SHJ
 	viz_se = False # visualize standard error in plot
-
+	
+	# counters for proper translation to .csv file
+	global type_tracker
+	type_tracker = 1 
+	global num_rows 
+	num_rows = (num_epochs // track_inc) + 1
+	
+	# initialize DataFrame for translation to .csv
+	epoch_range = list(range(track_inc,num_epochs+1,track_inc))
+	epoch_range.insert(0,1)
+	df = pd.DataFrame(index=range(1,(num_rows)*ntype+1), 
+				   columns=['Model','Loss Type','Image Set','LR-Attention',
+				'LR-Association','c','phi','Type','Epoch','Train Loss',
+				'Train Accuracy'])
+	df.at[:,'Model'] = model_type
+	df.at[:,'Loss Type'] = loss_type
+	df.at[:,'LR-Attention'] = lr_attn
+	df.at[:,'LR-Association'] = lr_association
+	
 	POSITIVE,NEGATIVE = get_label_coding(loss_type)
 	if data_type == 'abstract':
 		list_perms = [(0,1,2)]
@@ -276,13 +300,6 @@ if __name__ == "__main__":
 	dim = list_exemplars[0].size(1)
 	print("Data loaded with " + str(dim) + " dimensions.")
 	
-	#global df
-	epoch_range = list(range(5,num_epochs+1,5))
-	epoch_range.insert(0,1)
-	df = pd.DataFrame(index=epoch_range, 
-				   columns=['Type I','Type II','Type III','Type IV','Type V','Type VI'])
-	types = ['Type I','Type II','Type III','Type IV','Type V','Type VI']
-
 	# Run ALCOVE on each SHJ problem
 	list_trackers = []
 	for pidx,exemplars in enumerate(list_exemplars): # all permutations of stimulus dimensions
@@ -290,13 +307,20 @@ if __name__ == "__main__":
 		print('Permutation ' + str(pidx))
 		for mytype in range(1,ntype+1): # from type I to type VI
 			print('  Training on type ' + str(mytype))
+			df.at[type_tracker:type_tracker+num_rows,'Type'] = mytype
 			labels = labels_by_type[mytype-1]
-			v_epoch,v_prob,v_acc,v_loss = train(exemplars,labels,num_epochs,loss_type,mytype-1)
+			v_epoch,v_prob,v_acc,v_loss = train(exemplars,labels,num_epochs,loss_type,mytype,track_inc)
 			tracker.append((v_epoch,v_prob,v_acc,v_loss))
 			print("")
+			type_tracker += num_rows
 		list_trackers.append(tracker)
 	
-	# Create directories/filenames for plots/csv files and title for plots
+	if(data_type == 'abstract'):
+		df.at[:,'Image Set'] = 'abstract'
+	else:
+		df.at[:,'Image Set'] = get_imageset()
+	
+	# create directories/filenames for plots/.csv files and title for plots
 	title = ''
 	if(args.plot):
 		file_dir = 'plots/' 
@@ -349,6 +373,7 @@ if __name__ == "__main__":
 	except FileExistsError:
 		pass
 
+	# plot or save to .csv
 	if(args.plot):
 		A = np.array(list_trackers) # nperms x ntype x 4 tracker types x n_iters
 		M = np.mean(A,axis=0) # ntype x 4 tracker types x n_iters
