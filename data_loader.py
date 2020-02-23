@@ -11,8 +11,6 @@ import matplotlib.pyplot as plt
 fn_shj_abstract = 'data/shj_stimuli.txt'
 fn_shj_labels = 'data/shj_labels.txt'
 
-imageset_string = ''
-
 def get_label_coding(loss_type):
 	# Set coding for class A and class B
 	POSITIVE = 1.
@@ -53,10 +51,7 @@ def process_shj_images(net_type, im_dir):
 	# Return
 	#  X : [ne x dim tensor] stimuli as rows
 	#mydir = 'data/shj_images_set3_resize'
-	# mydir = 'data/shj_images_set2'
-	
-	global imageset_string 
-	imageset_string = im_dir[5:]
+	# mydir = 'data/shj_images_set2'	
 	
 	print(" Passing SHJ images through ConvNet...")
 	# stimuli,images = get_features(mydir,'vgg11')
@@ -139,6 +134,3 @@ def load_shj_images(loss_type, net_type, im_dir, perm=[0,1,2], viz_cats=False):
 		plt.show()
 
 	return X,y_list
-
-def get_imageset(): 
-	return imageset_string

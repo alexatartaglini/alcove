@@ -5,7 +5,7 @@ import torch.optim as optim
 import numpy as np
 import matplotlib.pyplot as plt    
 from itertools import permutations
-from data_loader import get_label_coding,load_shj_abstract,load_shj_images, get_imageset
+from data_loader import get_label_coding,load_shj_abstract,load_shj_images
 from scipy.stats import sem
 from os import mkdir
 import pandas as pd
