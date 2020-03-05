@@ -1,4 +1,3 @@
-import argparse
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -218,36 +217,29 @@ def train(exemplars,labels,num_epochs,loss_type,typenum,track_inc=5,verbose_para
 if __name__ == "__main__":
 	
 	models = ['mlp','alcove']
-	datasets = ['abstract', 'shj_images_set1','shj_images_set2','shj_images_set3']
+	datasets = ['shj_images_set1','shj_images_set2','shj_images_set3']
+	datasets_ab = ['abstract']
 	nets = ['resnet18','resnet152','vgg11']
 	losses = ['hinge','ll']
 	epochs = [16, 32, 64, 128]
 	
 	plot = False # saves plots when true
-	single_run = False # does not loop over configurations when true
 	track_inc = 4 # step size for recording epochs
 	
-	if(single_run):
-		configs = [('alcove','abstract','resnet18','hinge',16)] # settings for single run
-	else:
-		configs_long = itertools.product(models, datasets, nets, losses, epochs)
-		configs = []
-		# remove unnecessary configurations
-		for tup in configs_long:
-			if(tup[1] == 'abstract'):
-				if(tup[2] == 'resnet18'):
-					configs.append(tup)
-			else:
-				configs.append(tup)
-				
-	for i, (model_type, image_set, net_type, loss_type, num_epochs) in enumerate(configs):
-		if(image_set == 'abstract'):
-			print(f'config {i}: {model_type}, {image_set}, {loss_type} loss, {num_epochs} epochs')
-			data_type = 'abstract'
-		else:
-			print(f'config {i}: {model_type}, {image_set}, {net_type}, {loss_type} loss, {num_epochs} epochs')
-			data_type = 'images'
-			im_dir = 'data/' + image_set # assuming imagesets in a folder titled data
+	# create directory for extracted features 
+	try:
+		mkdir('pickle')
+	except FileExistsError:
+		pass
+	
+	configs_im = itertools.product(models, datasets, nets, losses, epochs)
+	configs_ab = itertools.product(models, datasets_ab, losses, epochs)
+	
+	# data type = images 
+	for i, (model_type, image_set, net_type, loss_type, num_epochs) in enumerate(configs_im):
+		print(f'config {i}: {model_type}, {image_set}, {net_type}, {loss_type} loss, {num_epochs} epochs')
+		data_type = 'images'
+		im_dir = 'data/' + image_set # assuming imagesets in a folder titled data
 			
 		lr_association = 0.03 # learning rate for association weights
 		lr_attn = 0.0033 # learning rate for attention weights
@@ -274,22 +266,13 @@ if __name__ == "__main__":
 		df.at[:,'Image Set'] = image_set
 		
 		POSITIVE,NEGATIVE = get_label_coding(loss_type)
-		if data_type == 'abstract':
-			list_perms = [(0,1,2)]
-			list_exemplars = []
-			for p in list_perms:
-				exemplars,labels_by_type = load_shj_abstract(loss_type,p) 
-					# [n_exemplars x dim tensor],list of [n_exemplars tensor]		
-				list_exemplars.append(exemplars)
-		elif data_type == 'images':
-			list_perms = list(permutations([0,1,2])) # ways of assigning abstract dimensions to visual ones
-			list_exemplars = []
-			for p in list_perms:
-				exemplars,labels_by_type = load_shj_images(loss_type,net_type,im_dir,p)
-					# [n_exemplars x dim tensor],list of [n_exemplars tensor]
-				list_exemplars.append(exemplars)
-		else:
-			assert False
+		list_perms = list(permutations([0,1,2])) # ways of assigning abstract dimensions to visual ones
+		list_exemplars = []
+		for p in list_perms:
+			exemplars,labels_by_type = load_shj_images(loss_type,net_type,im_dir,p)
+				# [n_exemplars x dim tensor],list of [n_exemplars tensor]
+			list_exemplars.append(exemplars)
+			
 		dim = list_exemplars[0].size(1)
 		print("Data loaded with " + str(dim) + " dimensions.")
 		
@@ -324,12 +307,8 @@ if __name__ == "__main__":
 			title += 'ALCOVE Model: '
 		elif model_type == 'mlp':
 			title += 'MLP Model: '
-		if data_type == 'abstract':
-			title += 'Abstract Stimulus, '
-			file_dir += 'ab_'
-		elif data_type == 'images':
-			title += 'Image Stimulus ' + '(' + net_type + '), '
-			file_dir += 'im_' + net_type + '_'
+		title += 'Image Stimulus ' + '(' + net_type + '), '
+		file_dir += 'im_' + net_type + '_'
 		if loss_type == 'hinge':
 			title += 'Hinge Loss'
 		elif loss_type == 'll':
@@ -385,3 +364,132 @@ if __name__ == "__main__":
 			plt.show()
 		else:
 			df.to_csv(file_dir + '.csv')
+	
+	
+	# data type = abstract
+	for i, (model_type, image_set, loss_type, num_epochs) in enumerate(configs_ab):
+		print(f'config {i}: {model_type}, {image_set}, {loss_type} loss, {num_epochs} epochs')
+		data_type = 'abstract'
+		
+		lr_association = 0.03 # learning rate for association weights
+		lr_attn = 0.0033 # learning rate for attention weights
+		ntype = 6 # number of types in SHJ
+		viz_se = False # visualize standard error in plot	
+		
+		# counters for proper translation to .csv file
+		type_tracker = 1 
+		num_rows = (num_epochs // track_inc) + 1
+		
+		# initialize DataFrame for translation to .csv
+		epoch_range = list(range(track_inc,num_epochs+1,track_inc))
+		epoch_range.insert(0,1)
+		df = pd.DataFrame(index=range(1,(num_rows)*ntype+1), 
+					   columns=['Model','Loss Type','Image Set','LR-Attention',
+					'LR-Association','c','phi','Type','Epoch','Train Loss',
+					'Train Accuracy','Probability Correct'])
+		df.at[:,'Model'] = model_type
+		df.at[:,'Loss Type'] = loss_type
+		df.at[:,'LR-Attention'] = lr_attn
+		df.at[:,'LR-Association'] = lr_association
+		df.at[:,'Image Set'] = image_set
+		
+		POSITIVE,NEGATIVE = get_label_coding(loss_type)
+		list_perms = [(0,1,2)]
+		list_exemplars = []
+		for p in list_perms:
+			exemplars,labels_by_type = load_shj_abstract(loss_type,p) 
+				# [n_exemplars x dim tensor],list of [n_exemplars tensor]		
+			list_exemplars.append(exemplars)
+			
+		dim = list_exemplars[0].size(1)
+		print("Data loaded with " + str(dim) + " dimensions.")
+		
+		# Run ALCOVE on each SHJ problem
+		list_trackers = []
+		for pidx,exemplars in enumerate(list_exemplars): # all permutations of stimulus dimensions
+			tracker = []
+			print('Permutation ' + str(pidx))
+			for mytype in range(1,ntype+1): # from type I to type VI
+				print('  Training on type ' + str(mytype))
+				df.at[type_tracker:type_tracker+num_rows,'Type'] = mytype
+				labels = labels_by_type[mytype-1]
+				v_epoch,v_prob,v_acc,v_loss = train(exemplars,labels,num_epochs,loss_type,mytype,track_inc)
+				tracker.append((v_epoch,v_prob,v_acc,v_loss))
+				print("")
+				type_tracker += num_rows
+			list_trackers.append(tracker)
+			
+		# create directories/filenames for plots/.csv files and title for plots
+		title = ''
+		if(plot):
+			file_dir = 'plots/' 
+		else:
+			file_dir = 'csv/'
+			
+		file_dir += image_set
+		subdir_name = file_dir
+		
+		file_dir = file_dir + "/" + model_type + "_"
+			
+		if model_type == 'alcove':
+			title += 'ALCOVE Model: '
+		elif model_type == 'mlp':
+			title += 'MLP Model: '
+		title += 'Abstract Stimulus, '
+		file_dir += 'ab_'
+		if loss_type == 'hinge':
+			title += 'Hinge Loss'
+		elif loss_type == 'll':
+			title += 'Log-Likelihood Loss'
+			
+		file_dir += loss_type + "_" + str(num_epochs)
+		
+		if(plot):
+			dir_name = 'plots'
+		else:
+			dir_name = 'csv'
+		
+		try:
+			mkdir(dir_name)
+		except FileExistsError:
+			pass
+		try:
+			mkdir(subdir_name)
+		except FileExistsError:
+			pass
+	
+		# plot or save to .csv
+		if(plot):
+			A = np.array(list_trackers) # nperms x ntype x 4 tracker types x n_iters
+			M = np.mean(A,axis=0) # ntype x 4 tracker types x n_iters
+			SE = sem(A,axis=0) # ntype x 4 tracker types x n_iters		
+			
+			plt.figure(1)
+			for i in range(ntype): 
+				if viz_se:
+					plt.errorbar(M[i,0,:],M[i,1,:],yerr=SE[i,1,:],linewidth=4./(i+1))
+				else:
+					plt.plot(M[i,0,:],M[i,1,:],linewidth=4./(i+1))
+							
+			plt.suptitle(title)
+			plt.xlabel('Block')
+			plt.ylabel('Probability correct')
+			plt.legend(["Type " + str(s) for s in range(1,7)])
+			plt.savefig(file_dir + '1.png')
+			
+			plt.figure(2)
+			for i in range(ntype):
+				if viz_se:
+					plt.errorbar(M[i,0,:],M[i,3,:],yerr=SE[i,3,:],linewidth=4./(i+1))  # v is [tracker type x n_iters]
+				else:
+					plt.plot(M[i,0,:],M[i,3,:],linewidth=4./(i+1))  # v is [tracker type x n_iters]
+			
+			plt.suptitle(title)
+			plt.xlabel('epoch')
+			plt.ylabel('loss')
+			plt.legend(["Type " + str(s) for s in range(1,7)])
+			plt.savefig(file_dir + '2.png')
+			plt.show()
+		else:
+			df.to_csv(file_dir + '.csv')
+		
