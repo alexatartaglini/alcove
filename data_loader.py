@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 from convnet_feat import get_features, imshow
 import matplotlib.pyplot as plt
+import pickle
+from os import path
 
 # Functions for loading SHJ abstract data and images
 
@@ -49,17 +51,38 @@ def load_shj(loss_type):
 
 def process_shj_images(net_type, im_dir):
 	# Return
-	#  X : [ne x dim tensor] stimuli as rows
-	#mydir = 'data/shj_images_set3_resize'
-	# mydir = 'data/shj_images_set2'	
+	#  X : [ne x dim tensor] stimuli as rows	
 	
-	print(" Passing SHJ images through ConvNet...")
-	# stimuli,images = get_features(mydir,'vgg11')
-	stimuli,images = get_features(im_dir,net_type)
+	pickle_dir_stim = 'pickle/' + net_type + '_' + im_dir[5:] + 'stim.pickle'
+	pickle_dir_im = 'pickle/' + net_type + '_' + im_dir[5:] + 'im.pickle'
+	
+	if(path.exists(pickle_dir_stim) and path.exists(pickle_dir_im)):
+		print(" Retrieving saved features...")
+		infile = open(pickle_dir_stim, 'rb')
+		stimuli = pickle.load(infile)
+		infile.close()
+		
+		print(" Retrieving saved raw images...")
+		infile = open(pickle_dir_im, 'rb')
+		images = pickle.load(infile)
+		infile.close()
+	else:	
+		print(" Passing SHJ images through ConvNet...")
+		# stimuli,images = get_features(mydir,'vgg11')
+		stimuli,images = get_features(im_dir,net_type)
 
-	print(" Done.")
-	stimuli = stimuli.cpu().data.numpy().astype(float)
-	images = images.cpu().data.numpy()
+		print(" Done.")
+		
+		stimuli = stimuli.cpu().data.numpy().astype(float)
+		images = images.cpu().data.numpy()
+		outfile = open(pickle_dir_stim, 'wb')
+		pickle.dump(stimuli, outfile)
+		outfile.close()
+		
+		outfile = open(pickle_dir_im, 'wb')
+		pickle.dump(images, outfile)
+		outfile.close()
+		
 	X = torch.tensor(stimuli).float()
 	return X,images
 
