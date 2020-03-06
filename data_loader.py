@@ -20,6 +20,8 @@ def get_label_coding(loss_type):
 		NEGATIVE = -1.
 	elif loss_type == 'll':
 		NEGATIVE = 0.
+	elif loss_type == 'mse':
+		NEGATIVE = 0.
 	else:
 		assert False
 	return POSITIVE,NEGATIVE

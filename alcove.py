@@ -180,6 +180,8 @@ def train(exemplars,labels,num_epochs,loss_type,typenum,track_inc=5,verbose_para
 		loss = torch.nn.BCEWithLogitsLoss(reduction='sum')
 	elif loss_type == 'hinge':
 		loss = HingeLoss
+	elif loss_type == 'mse':
+		loss = torch.nn.MSELoss(reduction='sum')
 	else:
 		assert False # undefined loss
 	
@@ -223,8 +225,8 @@ if __name__ == "__main__":
 	datasets_ab = ['abstract']
 	#nets = ['resnet18','resnet152','vgg11']
 	nets = ['resnet18']
-	#losses = ['hinge','ll']
-	losses = ['hinge']
+	#losses = ['hinge','ll','mse']
+	losses = ['mse']
 	#epochs = [16, 32, 64, 128]
 	epochs = [16]
 	
@@ -322,6 +324,8 @@ if __name__ == "__main__":
 			title += 'Hinge Loss'
 		elif loss_type == 'll':
 			title += 'Log-Likelihood Loss'
+		elif loss_type == 'mse':
+			title+= 'Mean Squared Error Loss'
 			
 		file_dir += loss_type + "_" + str(num_epochs)
 		
@@ -454,6 +458,8 @@ if __name__ == "__main__":
 			title += 'Hinge Loss'
 		elif loss_type == 'll':
 			title += 'Log-Likelihood Loss'
+		elif loss_type == 'mse':
+			title+= 'Mean Squared Error Loss'
 			
 		file_dir += loss_type + "_" + str(num_epochs)
 		
