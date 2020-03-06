@@ -216,12 +216,17 @@ def train(exemplars,labels,num_epochs,loss_type,typenum,track_inc=5,verbose_para
 
 if __name__ == "__main__":
 	
-	models = ['mlp','alcove']
-	datasets = ['shj_images_set1','shj_images_set2','shj_images_set3']
+	#models = ['mlp','alcove']
+	models = ['alcove']
+	#datasets = ['shj_images_set1','shj_images_set2','shj_images_set3']
+	datasets = ['shj_images_set2']
 	datasets_ab = ['abstract']
-	nets = ['resnet18','resnet152','vgg11']
-	losses = ['hinge','ll']
-	epochs = [16, 32, 64, 128]
+	#nets = ['resnet18','resnet152','vgg11']
+	nets = ['resnet18']
+	#losses = ['hinge','ll']
+	losses = ['hinge']
+	#epochs = [16, 32, 64, 128]
+	epochs = [16]
 	
 	plot = False # saves plots when true
 	track_inc = 4 # step size for recording epochs
@@ -251,19 +256,8 @@ if __name__ == "__main__":
 		type_tracker = 1 
 		global num_rows 
 		num_rows = (num_epochs // track_inc) + 1
-		
-		# initialize DataFrame for translation to .csv
-		epoch_range = list(range(track_inc,num_epochs+1,track_inc))
-		epoch_range.insert(0,1)
-		df = pd.DataFrame(index=range(1,(num_rows)*ntype+1), 
-					   columns=['Model','Loss Type','Image Set','LR-Attention',
-					'LR-Association','c','phi','Type','Epoch','Train Loss',
-					'Train Accuracy','Probability Correct'])
-		df.at[:,'Model'] = model_type
-		df.at[:,'Loss Type'] = loss_type
-		df.at[:,'LR-Attention'] = lr_attn
-		df.at[:,'LR-Association'] = lr_association
-		df.at[:,'Image Set'] = image_set
+		perm_tracker = 1
+		num_rows_p = num_rows*ntype
 		
 		POSITIVE,NEGATIVE = get_label_coding(loss_type)
 		list_perms = list(permutations([0,1,2])) # ways of assigning abstract dimensions to visual ones
@@ -273,6 +267,19 @@ if __name__ == "__main__":
 				# [n_exemplars x dim tensor],list of [n_exemplars tensor]
 			list_exemplars.append(exemplars)
 			
+		# initialize DataFrame for translation to .csv
+		epoch_range = list(range(track_inc,num_epochs+1,track_inc))
+		epoch_range.insert(0,1)
+		df = pd.DataFrame(index=range(1,(num_rows)*ntype*len(list_exemplars)+1), 
+					   columns=['Model','Loss Type','Image Set','LR-Attention',
+					'LR-Association','c','phi','Permutation','Type','Epoch','Train Loss',
+					'Train Accuracy','Probability Correct'])
+		df.at[:,'Model'] = model_type
+		df.at[:,'Loss Type'] = loss_type
+		df.at[:,'LR-Attention'] = lr_attn
+		df.at[:,'LR-Association'] = lr_association
+		df.at[:,'Image Set'] = image_set
+		
 		dim = list_exemplars[0].size(1)
 		print("Data loaded with " + str(dim) + " dimensions.")
 		
@@ -281,6 +288,7 @@ if __name__ == "__main__":
 		for pidx,exemplars in enumerate(list_exemplars): # all permutations of stimulus dimensions
 			tracker = []
 			print('Permutation ' + str(pidx))
+			df.at[perm_tracker:perm_tracker+num_rows_p,'Permutation'] = pidx
 			for mytype in range(1,ntype+1): # from type I to type VI
 				print('  Training on type ' + str(mytype))
 				df.at[type_tracker:type_tracker+num_rows,'Type'] = mytype
@@ -290,6 +298,7 @@ if __name__ == "__main__":
 				print("")
 				type_tracker += num_rows
 			list_trackers.append(tracker)
+			perm_tracker += num_rows_p
 			
 		# create directories/filenames for plots/.csv files and title for plots
 		title = ''
@@ -379,19 +388,8 @@ if __name__ == "__main__":
 		# counters for proper translation to .csv file
 		type_tracker = 1 
 		num_rows = (num_epochs // track_inc) + 1
-		
-		# initialize DataFrame for translation to .csv
-		epoch_range = list(range(track_inc,num_epochs+1,track_inc))
-		epoch_range.insert(0,1)
-		df = pd.DataFrame(index=range(1,(num_rows)*ntype+1), 
-					   columns=['Model','Loss Type','Image Set','LR-Attention',
-					'LR-Association','c','phi','Type','Epoch','Train Loss',
-					'Train Accuracy','Probability Correct'])
-		df.at[:,'Model'] = model_type
-		df.at[:,'Loss Type'] = loss_type
-		df.at[:,'LR-Attention'] = lr_attn
-		df.at[:,'LR-Association'] = lr_association
-		df.at[:,'Image Set'] = image_set
+		perm_tracker = 1
+		num_rows_p = num_rows*ntype
 		
 		POSITIVE,NEGATIVE = get_label_coding(loss_type)
 		list_perms = [(0,1,2)]
@@ -400,7 +398,20 @@ if __name__ == "__main__":
 			exemplars,labels_by_type = load_shj_abstract(loss_type,p) 
 				# [n_exemplars x dim tensor],list of [n_exemplars tensor]		
 			list_exemplars.append(exemplars)
-			
+		
+		# initialize DataFrame for translation to .csv
+		epoch_range = list(range(track_inc,num_epochs+1,track_inc))
+		epoch_range.insert(0,1)
+		df = pd.DataFrame(index=range(1,(num_rows)*ntype*len(list_exemplars)+1), 
+					   columns=['Model','Loss Type','Image Set','LR-Attention',
+					'LR-Association','c','phi','Permutation','Type','Epoch','Train Loss',
+					'Train Accuracy','Probability Correct'])
+		df.at[:,'Model'] = model_type
+		df.at[:,'Loss Type'] = loss_type
+		df.at[:,'LR-Attention'] = lr_attn
+		df.at[:,'LR-Association'] = lr_association
+		df.at[:,'Image Set'] = image_set
+
 		dim = list_exemplars[0].size(1)
 		print("Data loaded with " + str(dim) + " dimensions.")
 		
@@ -409,6 +420,7 @@ if __name__ == "__main__":
 		for pidx,exemplars in enumerate(list_exemplars): # all permutations of stimulus dimensions
 			tracker = []
 			print('Permutation ' + str(pidx))
+			df.at[perm_tracker:perm_tracker+num_rows_p,'Permutation'] = pidx
 			for mytype in range(1,ntype+1): # from type I to type VI
 				print('  Training on type ' + str(mytype))
 				df.at[type_tracker:type_tracker+num_rows,'Type'] = mytype
@@ -418,6 +430,7 @@ if __name__ == "__main__":
 				print("")
 				type_tracker += num_rows
 			list_trackers.append(tracker)
+			perm_tracker += num_rows_p
 			
 		# create directories/filenames for plots/.csv files and title for plots
 		title = ''
