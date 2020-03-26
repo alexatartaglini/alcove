@@ -151,14 +151,10 @@ def HingeLoss(output, target):
     return torch.sum(hinge_loss)
 
 def HumbleTeacherLoss(output, target):
-	teacher_vals = torch.ones([len(output)])
-	for i in range(0,len(output)):
-		if(output[i] > 1 or output[i] < -1):
-			teacher_vals[i] = abs(output[i])
-	humble_loss = teacher_vals-torch.mul(output, target)
-	humble_loss = humble_loss**2
-	humble_loss = torch.sum(humble_loss)
-	return .5 * humble_loss
+	humble_loss = torch.mul(output, target)
+	humble_loss[humble_loss > 1] = 0
+	humble_loss = (1.-humble_loss)**2
+	return .5 * torch.sum(humble_loss)
 
 
 def train(exemplars,labels,num_epochs,loss_type,typenum,track_inc=5,verbose_params=False):
@@ -400,8 +396,8 @@ if __name__ == "__main__":
 		data_type = 'abstract'
 		
 		lr_association = 0.03 # learning rate for association weights
-		#lr_attn = 0.0033 # learning rate for attention weights
-		lr_attn = 0
+		lr_attn = 0.0033 # learning rate for attention weights
+		#lr_attn = 0
 		ntype = 6 # number of types in SHJ
 		viz_se = False # visualize standard error in plot	
 		
