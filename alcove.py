@@ -151,15 +151,15 @@ def HingeLoss(output, target):
     return torch.sum(hinge_loss)
 
 def HumbleTeacherLoss(output, target):
-	teacher_vals = target.clone()
-	#print("Teacher vals: " + str(teacher_vals))
-	#print("Output vals: " + str(output))
-	teacher_vals[output > 1] = output[output > 1]
-	teacher_vals[output < -1] = output[output < -1]
-	#print("New teacher vals: " + str(teacher_vals))
-	humble_loss = (teacher_vals-output)
-	humble_loss = torch.mul(humble_loss,humble_loss)	
-	return .5 * torch.sum(humble_loss)
+	teacher_vals = torch.ones([len(output)])
+	for i in range(0,len(output)):
+		if(output[i] > 1 or output[i] < -1):
+			teacher_vals[i] = abs(output[i])
+	humble_loss = teacher_vals-torch.mul(output, target)
+	humble_loss = humble_loss**2
+	humble_loss = torch.sum(humble_loss)
+	return .5 * humble_loss
+
 
 def train(exemplars,labels,num_epochs,loss_type,typenum,track_inc=5,verbose_params=False):
 	# Train model on a SHJ problem
@@ -192,7 +192,7 @@ def train(exemplars,labels,num_epochs,loss_type,typenum,track_inc=5,verbose_para
 	elif loss_type == 'hinge':
 		loss = HingeLoss
 	elif loss_type == 'mse':
-		loss = torch.nn.MSELoss(reduction='sum')
+		loss = torch.nn.MSELoss(reduction='mean')
 	elif loss_type == 'humble':
 		loss = HumbleTeacherLoss
 	else:
@@ -262,8 +262,7 @@ if __name__ == "__main__":
 		im_dir = 'data/' + image_set # assuming imagesets in a folder titled data
 			
 		lr_association = 0.03 # learning rate for association weights
-		#lr_attn = 0.0033 # learning rate for attention weights
-		lr_attn = 0
+		lr_attn = 0.0033 # learning rate for attention weights
 		ntype = 6 # number of types in SHJ
 		viz_se = False # visualize standard error in plot	
 		
@@ -401,7 +400,8 @@ if __name__ == "__main__":
 		data_type = 'abstract'
 		
 		lr_association = 0.03 # learning rate for association weights
-		lr_attn = 0.0033 # learning rate for attention weights
+		#lr_attn = 0.0033 # learning rate for attention weights
+		lr_attn = 0
 		ntype = 6 # number of types in SHJ
 		viz_se = False # visualize standard error in plot	
 		
