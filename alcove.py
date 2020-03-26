@@ -150,6 +150,17 @@ def HingeLoss(output, target):
     hinge_loss[hinge_loss < 0] = 0.
     return torch.sum(hinge_loss)
 
+def HumbleTeacherLoss(output, target):
+	teacher_vals = target.clone()
+	#print("Teacher vals: " + str(teacher_vals))
+	#print("Output vals: " + str(output))
+	teacher_vals[output > 1] = output[output > 1]
+	teacher_vals[output < -1] = output[output < -1]
+	#print("New teacher vals: " + str(teacher_vals))
+	humble_loss = (teacher_vals-output)
+	humble_loss = torch.mul(humble_loss,humble_loss)	
+	return .5 * torch.sum(humble_loss)
+
 def train(exemplars,labels,num_epochs,loss_type,typenum,track_inc=5,verbose_params=False):
 	# Train model on a SHJ problem
 	# 
@@ -182,6 +193,8 @@ def train(exemplars,labels,num_epochs,loss_type,typenum,track_inc=5,verbose_para
 		loss = HingeLoss
 	elif loss_type == 'mse':
 		loss = torch.nn.MSELoss(reduction='sum')
+	elif loss_type == 'humble':
+		loss = HumbleTeacherLoss
 	else:
 		assert False # undefined loss
 	
@@ -225,12 +238,12 @@ if __name__ == "__main__":
 	datasets_ab = ['abstract']
 	#nets = ['resnet18','resnet152','vgg11']
 	nets = ['resnet18']
-	#losses = ['hinge','ll','mse']
-	losses = ['mse']
+	#losses = ['hinge','ll','mse','humble']
+	losses = ['humble']
 	#epochs = [16, 32, 64, 128]
-	epochs = [16]
+	epochs = [50]
 	
-	plot = False # saves plots when true
+	plot = True # saves plots when true
 	track_inc = 4 # step size for recording epochs
 	
 	# create directory for extracted features 
@@ -249,7 +262,8 @@ if __name__ == "__main__":
 		im_dir = 'data/' + image_set # assuming imagesets in a folder titled data
 			
 		lr_association = 0.03 # learning rate for association weights
-		lr_attn = 0.0033 # learning rate for attention weights
+		#lr_attn = 0.0033 # learning rate for attention weights
+		lr_attn = 0
 		ntype = 6 # number of types in SHJ
 		viz_se = False # visualize standard error in plot	
 		
@@ -326,6 +340,8 @@ if __name__ == "__main__":
 			title += 'Log-Likelihood Loss'
 		elif loss_type == 'mse':
 			title+= 'Mean Squared Error Loss'
+		elif loss_type == 'humble':
+			title+= 'Humble Teacher Loss'
 			
 		file_dir += loss_type + "_" + str(num_epochs)
 		
@@ -460,6 +476,8 @@ if __name__ == "__main__":
 			title += 'Log-Likelihood Loss'
 		elif loss_type == 'mse':
 			title+= 'Mean Squared Error Loss'
+		elif loss_type == 'humble':
+			title+= 'Humble Teacher Loss'
 			
 		file_dir += loss_type + "_" + str(num_epochs)
 		

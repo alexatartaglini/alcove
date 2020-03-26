@@ -22,6 +22,8 @@ def get_label_coding(loss_type):
 		NEGATIVE = 0.
 	elif loss_type == 'mse':
 		NEGATIVE = 0.
+	elif loss_type == 'humble':
+		NEGATIVE = -1.
 	else:
 		assert False
 	return POSITIVE,NEGATIVE
