@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from itertools import permutations
 from data_loader import get_label_coding,load_shj_abstract,load_shj_images
 from scipy.stats import sem
-from os import mkdir
+from os import mkdir, path
 import pandas as pd
 import itertools
 
@@ -23,7 +23,7 @@ import itertools
 
 class ALCOVE(nn.Module):
 
-	def __init__(self, exemplars, c=6.5, phi=2.5):
+	def __init__(self, exemplars, c, phi):
 		# Input
 		#   exemplars: [ne x dim] rows are exemplars provided to model
 		super(ALCOVE, self).__init__()
@@ -67,7 +67,7 @@ class ALCOVE(nn.Module):
 
 class MLP(nn.Module):
 
-	def __init__(self, nhid=8, phi=2.0):
+	def __init__(self, phi, nhid=8):
 		# Input
 		#   exemplars: [ne x dim] rows are exemplars provided to model
 		super(MLP, self).__init__()
@@ -157,7 +157,7 @@ def HumbleTeacherLoss(output, target):
 	return .5 * torch.sum(humble_loss)
 
 
-def train(exemplars,labels,num_epochs,loss_type,typenum,track_inc=5,verbose_params=False):
+def train(exemplars,labels,num_epochs,loss_type,typenum,c,phi,track_inc=5,verbose_params=False):
 	# Train model on a SHJ problem
 	# 
 	# Input
@@ -174,14 +174,14 @@ def train(exemplars,labels,num_epochs,loss_type,typenum,track_inc=5,verbose_para
 	n_exemplars = exemplars.size(0)
 	
 	if model_type == 'mlp':
-		net = MLP()
+		net = MLP(phi)
 	elif model_type == 'alcove':
-		net = ALCOVE(exemplars)
-		df.at[type_tracker:type_tracker+num_rows,'c'] = net.c
+		net = ALCOVE(exemplars,c,phi)
+		#df.at[type_tracker:type_tracker+num_rows,'c'] = net.c
 	else:
 		assert False
 		
-	df.at[type_tracker:type_tracker+num_rows,'phi'] = net.phi
+	#df.at[type_tracker:type_tracker+num_rows,'phi'] = net.phi
 
 	if loss_type == 'll':
 		loss = torch.nn.BCEWithLogitsLoss(reduction='sum')
@@ -227,19 +227,35 @@ def train(exemplars,labels,num_epochs,loss_type,typenum,track_inc=5,verbose_para
 
 if __name__ == "__main__":
 	
-	#models = ['mlp','alcove']
+	# values for parameters and hyperparameters
+	models = ['mlp','alcove']
+	datasets = ['shj_images_set1','shj_images_set2','shj_images_set3']
+	datasets_ab = ['abstract']
+	nets = ['resnet18','resnet152','vgg11']
+	losses = ['hinge','ll','mse','humble']
+	epochs = [16, 32, 64, 128]
+	lr_associations = [0.005, 0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.045, 0.05]
+	lr_attns = [0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01]
+	cs = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 
+	   8.0, 8.5, 9.0, 9.5, 10.0]
+	phis = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0, 
+		 3.25, 3.5, 3.75, 4.0, 4.25, 4.5, 4.75, 5.0]
+	
+	'''
 	models = ['alcove']
-	#datasets = ['shj_images_set1','shj_images_set2','shj_images_set3']
 	datasets = ['shj_images_set2']
 	datasets_ab = ['abstract']
-	#nets = ['resnet18','resnet152','vgg11']
 	nets = ['resnet18']
-	#losses = ['hinge','ll','mse','humble']
 	losses = ['humble']
-	#epochs = [16, 32, 64, 128]
 	epochs = [50]
+	lr_associations = [0.005, 0.01]
+	lr_attns = [0.001,0.002]
+	cs = [0.5,1.0]
+	phis = [0.25,1.0]
+	'''
 	
-	plot = True # saves plots when true
+	plot = False # saves plots when true
+	start_over = True # overwrites existing csv files (for the first run) when true
 	track_inc = 4 # step size for recording epochs
 	
 	# create directory for extracted features 
@@ -248,17 +264,20 @@ if __name__ == "__main__":
 	except FileExistsError:
 		pass
 	
-	configs_im = itertools.product(models, datasets, nets, losses, epochs)
-	configs_ab = itertools.product(models, datasets_ab, losses, epochs)
+	configs_im = itertools.product(models, datasets, nets, losses, epochs,
+								lr_associations,lr_attns,cs,phis)
+	configs_ab = itertools.product(models, datasets_ab, losses, epochs,
+								lr_associations,lr_attns,cs,phis)
 	
 	# data type = images 
-	for i, (model_type, image_set, net_type, loss_type, num_epochs) in enumerate(configs_im):
+	for i, (model_type, image_set, net_type, loss_type, num_epochs,
+		 lr_association,lr_attn,c,phi) in enumerate(configs_im):
 		print(f'config {i}: {model_type}, {image_set}, {net_type}, {loss_type} loss, {num_epochs} epochs')
 		data_type = 'images'
 		im_dir = 'data/' + image_set # assuming imagesets in a folder titled data
 			
-		lr_association = 0.03 # learning rate for association weights
-		lr_attn = 0.0033 # learning rate for attention weights
+		#lr_association = 0.03 # learning rate for association weights
+		#lr_attn = 0.0033 # learning rate for attention weights
 		ntype = 6 # number of types in SHJ
 		viz_se = False # visualize standard error in plot	
 		
@@ -290,6 +309,9 @@ if __name__ == "__main__":
 		df.at[:,'LR-Attention'] = lr_attn
 		df.at[:,'LR-Association'] = lr_association
 		df.at[:,'Image Set'] = image_set
+		if(model_type == 'alcove'):
+			df.at[:,'c'] = c
+		df.at[:,'phi'] = phi
 		
 		dim = list_exemplars[0].size(1)
 		print("Data loaded with " + str(dim) + " dimensions.")
@@ -304,7 +326,7 @@ if __name__ == "__main__":
 				print('  Training on type ' + str(mytype))
 				df.at[type_tracker:type_tracker+num_rows,'Type'] = mytype
 				labels = labels_by_type[mytype-1]
-				v_epoch,v_prob,v_acc,v_loss = train(exemplars,labels,num_epochs,loss_type,mytype,track_inc)
+				v_epoch,v_prob,v_acc,v_loss = train(exemplars,labels,num_epochs,loss_type,mytype,c,phi,track_inc)
 				tracker.append((v_epoch,v_prob,v_acc,v_loss))
 				print("")
 				type_tracker += num_rows
@@ -338,7 +360,7 @@ if __name__ == "__main__":
 		elif loss_type == 'humble':
 			title+= 'Humble Teacher Loss'
 			
-		file_dir += loss_type + "_" + str(num_epochs)
+		file_dir += loss_type + "_" + str(num_epochs) 
 		
 		if(plot):
 			dir_name = 'plots'
@@ -387,17 +409,21 @@ if __name__ == "__main__":
 			plt.savefig(file_dir + '2.png')
 			plt.show()
 		else:
-			df.to_csv(file_dir + '.csv')
+			if(path.isfile(file_dir + '.csv') and not start_over):
+				df.to_csv(file_dir + '.csv',mode='a',header=False)
+			else:
+				df.to_csv(file_dir + '.csv')
+				start_over = False
 	
 	
 	# data type = abstract
-	for i, (model_type, image_set, loss_type, num_epochs) in enumerate(configs_ab):
+	for i, (model_type, image_set, loss_type, num_epochs,
+		 lr_association,lr_attn,c,phi) in enumerate(configs_ab):
 		print(f'config {i}: {model_type}, {image_set}, {loss_type} loss, {num_epochs} epochs')
 		data_type = 'abstract'
 		
-		lr_association = 0.03 # learning rate for association weights
-		lr_attn = 0.0033 # learning rate for attention weights
-		#lr_attn = 0
+		#lr_association = 0.03 # learning rate for association weights
+		#lr_attn = 0.0033 # learning rate for attention weights
 		ntype = 6 # number of types in SHJ
 		viz_se = False # visualize standard error in plot	
 		
@@ -427,6 +453,9 @@ if __name__ == "__main__":
 		df.at[:,'LR-Attention'] = lr_attn
 		df.at[:,'LR-Association'] = lr_association
 		df.at[:,'Image Set'] = image_set
+		if(model_type == 'alcove'):
+			df.at[:,'c'] = c
+		df.at[:,'phi'] = phi
 
 		dim = list_exemplars[0].size(1)
 		print("Data loaded with " + str(dim) + " dimensions.")
@@ -441,7 +470,7 @@ if __name__ == "__main__":
 				print('  Training on type ' + str(mytype))
 				df.at[type_tracker:type_tracker+num_rows,'Type'] = mytype
 				labels = labels_by_type[mytype-1]
-				v_epoch,v_prob,v_acc,v_loss = train(exemplars,labels,num_epochs,loss_type,mytype,track_inc)
+				v_epoch,v_prob,v_acc,v_loss = train(exemplars,labels,num_epochs,loss_type,mytype,c,phi,track_inc)
 				tracker.append((v_epoch,v_prob,v_acc,v_loss))
 				print("")
 				type_tracker += num_rows
@@ -524,5 +553,9 @@ if __name__ == "__main__":
 			plt.savefig(file_dir + '2.png')
 			plt.show()
 		else:
-			df.to_csv(file_dir + '.csv')
+			if(path.isfile(file_dir + '.csv') and not start_over):
+				df.to_csv(file_dir + '.csv',mode='a',header=False)
+			else:
+				df.to_csv(file_dir + '.csv')
+				start_over = False
 		
