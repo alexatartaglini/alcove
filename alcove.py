@@ -489,7 +489,7 @@ if __name__ == "__main__":
 		if(plot):
 			file_dir = 'plots/' 
 		else:
-			file_dir = 'csv_test/'
+			file_dir = 'csv/'
 			
 		file_dir += image_set
 		subdir_name = file_dir
@@ -773,7 +773,7 @@ if __name__ == "__main__":
 		if(plot):
 			file_dir = 'plots/' 
 		else:
-			file_dir = 'csv_test/'
+			file_dir = 'csv/'
 			
 		file_dir += image_set
 		subdir_name = file_dir
