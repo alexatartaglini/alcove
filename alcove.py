@@ -228,31 +228,36 @@ def train(exemplars,labels,num_epochs,loss_type,typenum,c,phi,track_inc=5,verbos
 if __name__ == "__main__":
 	
 	# values for parameters and hyperparameters
-	models = ['mlp','alcove']
+	models_a = ['alcove']
+	models_mlp = ['mlp']
 	datasets = ['shj_images_set1','shj_images_set2','shj_images_set3']
 	datasets_ab = ['abstract']
 	nets = ['resnet18','resnet152','vgg11']
 	losses = ['hinge','ll','mse','humble']
 	epochs = [16, 32, 64, 128]
-	lr_associations = [0.005, 0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.045, 0.05]
-	lr_attns = [0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01]
-	cs = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 
-	   8.0, 8.5, 9.0, 9.5, 10.0]
-	phis = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0, 
-		 3.25, 3.5, 3.75, 4.0, 4.25, 4.5, 4.75, 5.0]
+	#lr_associations = [0.005, 0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.045, 0.05]
+	#lr_attns = [0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01]
+	#cs = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 
+	  # 8.0, 8.5, 9.0, 9.5, 10.0]
+	#phis = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0, 
+		 #3.25, 3.5, 3.75, 4.0, 4.25, 4.5, 4.75, 5.0]
 	
 	'''
-	models = ['alcove']
 	datasets = ['shj_images_set2']
 	datasets_ab = ['abstract']
 	nets = ['resnet18']
 	losses = ['humble']
 	epochs = [50]
-	lr_associations = [0.005, 0.01]
-	lr_attns = [0.001,0.002]
-	cs = [0.5,1.0]
-	phis = [0.25,1.0]
 	'''
+	#lr_associations = [0.005,0.01,0.015]
+	#lr_attns = [0.001,0.002,0.003]
+	#cs = [0.5,1.0,1.5]
+	#phis = [0.25,0.5,0.75]
+	lr_associations = [0.03]
+	lr_attns = [0.0033]
+	cs = [6.5]
+	phis = [2.5]
+
 	
 	plot = False # saves plots when true
 	start_over = True # overwrites existing csv files (for the first run) when true
@@ -264,14 +269,19 @@ if __name__ == "__main__":
 	except FileExistsError:
 		pass
 	
-	configs_im = itertools.product(models, datasets, nets, losses, epochs,
+	configs_im_alcove = itertools.product(models_a, datasets, nets, losses, epochs,
 								lr_associations,lr_attns,cs,phis)
-	configs_ab = itertools.product(models, datasets_ab, losses, epochs,
+	configs_ab_alcove = itertools.product(models_a, datasets_ab, losses, epochs,
 								lr_associations,lr_attns,cs,phis)
+	configs_im_mlp = itertools.product(models_mlp, datasets, nets, losses, epochs,
+								lr_associations,lr_attns,phis)
+	configs_ab_mlp = itertools.product(models_mlp, datasets_ab, losses, epochs,
+								lr_associations,lr_attns,phis)
 	
-	# data type = images 
+	'''
+	# data type = images, model = alcove
 	for i, (model_type, image_set, net_type, loss_type, num_epochs,
-		 lr_association,lr_attn,c,phi) in enumerate(configs_im):
+		 lr_association,lr_attn,c,phi) in enumerate(configs_im_alcove):
 		print(f'config {i}: {model_type}, {image_set}, {net_type}, {loss_type} loss, {num_epochs} epochs')
 		data_type = 'images'
 		im_dir = 'data/' + image_set # assuming imagesets in a folder titled data
@@ -301,10 +311,11 @@ if __name__ == "__main__":
 		epoch_range = list(range(track_inc,num_epochs+1,track_inc))
 		epoch_range.insert(0,1)
 		df = pd.DataFrame(index=range(1,(num_rows)*ntype*len(list_exemplars)+1), 
-					   columns=['Model','Loss Type','Image Set','LR-Attention',
+					   columns=['Model','Net','Loss Type','Image Set','LR-Attention',
 					'LR-Association','c','phi','Permutation','Type','Epoch','Train Loss',
 					'Train Accuracy','Probability Correct'])
 		df.at[:,'Model'] = model_type
+		df.at[:,'Net'] = net_type
 		df.at[:,'Loss Type'] = loss_type
 		df.at[:,'LR-Attention'] = lr_attn
 		df.at[:,'LR-Association'] = lr_association
@@ -345,11 +356,7 @@ if __name__ == "__main__":
 		
 		file_dir = file_dir + "/" + model_type + "_"
 			
-		if model_type == 'alcove':
-			title += 'ALCOVE Model: '
-		elif model_type == 'mlp':
-			title += 'MLP Model: '
-		title += 'Image Stimulus ' + '(' + net_type + '), '
+		title += 'ALCOVE Model: Image Stimulus ' + '(' + net_type + '), '
 		file_dir += 'im_' + net_type + '_'
 		if loss_type == 'hinge':
 			title += 'Hinge Loss'
@@ -414,11 +421,11 @@ if __name__ == "__main__":
 			else:
 				df.to_csv(file_dir + '.csv')
 				start_over = False
+	'''
 	
-	
-	# data type = abstract
+	# data type = abstract, model = alcove
 	for i, (model_type, image_set, loss_type, num_epochs,
-		 lr_association,lr_attn,c,phi) in enumerate(configs_ab):
+		 lr_association,lr_attn,c,phi) in enumerate(configs_ab_alcove):
 		print(f'config {i}: {model_type}, {image_set}, {loss_type} loss, {num_epochs} epochs')
 		data_type = 'abstract'
 		
@@ -445,7 +452,7 @@ if __name__ == "__main__":
 		epoch_range = list(range(track_inc,num_epochs+1,track_inc))
 		epoch_range.insert(0,1)
 		df = pd.DataFrame(index=range(1,(num_rows)*ntype*len(list_exemplars)+1), 
-					   columns=['Model','Loss Type','Image Set','LR-Attention',
+					   columns=['Model','Net','Loss Type','Image Set','LR-Attention',
 					'LR-Association','c','phi','Permutation','Type','Epoch','Train Loss',
 					'Train Accuracy','Probability Correct'])
 		df.at[:,'Model'] = model_type
@@ -482,18 +489,15 @@ if __name__ == "__main__":
 		if(plot):
 			file_dir = 'plots/' 
 		else:
-			file_dir = 'csv/'
+			file_dir = 'csv_test/'
 			
 		file_dir += image_set
 		subdir_name = file_dir
 		
 		file_dir = file_dir + "/" + model_type + "_"
 			
-		if model_type == 'alcove':
-			title += 'ALCOVE Model: '
-		elif model_type == 'mlp':
-			title += 'MLP Model: '
-		title += 'Abstract Stimulus, '
+
+		title += 'ALCOVE Model: Abstract Stimulus, '
 		file_dir += 'ab_'
 		if loss_type == 'hinge':
 			title += 'Hinge Loss'
@@ -558,4 +562,288 @@ if __name__ == "__main__":
 			else:
 				df.to_csv(file_dir + '.csv')
 				start_over = False
+				
+				
+	'''
+	# data type = images, model = mlp 
+	for i, (model_type, image_set, net_type, loss_type, num_epochs,
+		 lr_association,lr_attn,phi) in enumerate(configs_im_mlp):
+		print(f'config {i}: {model_type}, {image_set}, {net_type}, {loss_type} loss, {num_epochs} epochs')
+		data_type = 'images'
+		im_dir = 'data/' + image_set # assuming imagesets in a folder titled data
+			
+		#lr_association = 0.03 # learning rate for association weights
+		#lr_attn = 0.0033 # learning rate for attention weights
+		c = None
+		ntype = 6 # number of types in SHJ
+		viz_se = False # visualize standard error in plot	
+		
+		# counters for proper translation to .csv file
+		global type_tracker
+		type_tracker = 1 
+		global num_rows 
+		num_rows = (num_epochs // track_inc) + 1
+		perm_tracker = 1
+		num_rows_p = num_rows*ntype
+		
+		POSITIVE,NEGATIVE = get_label_coding(loss_type)
+		list_perms = list(permutations([0,1,2])) # ways of assigning abstract dimensions to visual ones
+		list_exemplars = []
+		for p in list_perms:
+			exemplars,labels_by_type = load_shj_images(loss_type,net_type,im_dir,p)
+				# [n_exemplars x dim tensor],list of [n_exemplars tensor]
+			list_exemplars.append(exemplars)
+			
+		# initialize DataFrame for translation to .csv
+		epoch_range = list(range(track_inc,num_epochs+1,track_inc))
+		epoch_range.insert(0,1)
+		df = pd.DataFrame(index=range(1,(num_rows)*ntype*len(list_exemplars)+1), 
+					   columns=['Model','Net','Loss Type','Image Set','LR-Attention',
+					'LR-Association','c','phi','Permutation','Type','Epoch','Train Loss',
+					'Train Accuracy','Probability Correct'])
+		df.at[:,'Model'] = model_type
+		df.at[:,'Net'] = net_type
+		df.at[:,'Loss Type'] = loss_type
+		df.at[:,'LR-Attention'] = lr_attn
+		df.at[:,'LR-Association'] = lr_association
+		df.at[:,'Image Set'] = image_set
+		df.at[:,'phi'] = phi
+		
+		dim = list_exemplars[0].size(1)
+		print("Data loaded with " + str(dim) + " dimensions.")
+		
+		# Run ALCOVE on each SHJ problem
+		list_trackers = []
+		for pidx,exemplars in enumerate(list_exemplars): # all permutations of stimulus dimensions
+			tracker = []
+			print('Permutation ' + str(pidx))
+			df.at[perm_tracker:perm_tracker+num_rows_p,'Permutation'] = pidx
+			for mytype in range(1,ntype+1): # from type I to type VI
+				print('  Training on type ' + str(mytype))
+				df.at[type_tracker:type_tracker+num_rows,'Type'] = mytype
+				labels = labels_by_type[mytype-1]
+				v_epoch,v_prob,v_acc,v_loss = train(exemplars,labels,num_epochs,loss_type,mytype,c,phi,track_inc)
+				tracker.append((v_epoch,v_prob,v_acc,v_loss))
+				print("")
+				type_tracker += num_rows
+			list_trackers.append(tracker)
+			perm_tracker += num_rows_p
+			
+		# create directories/filenames for plots/.csv files and title for plots
+		title = ''
+		if(plot):
+			file_dir = 'plots/' 
+		else:
+			file_dir = 'csv/'
+			
+		file_dir += image_set
+		subdir_name = file_dir
+		
+		file_dir = file_dir + "/" + model_type + "_"
+			
+		title += 'MLP Model: ' + 'Image Stimulus ' + '(' + net_type + '), '
+		file_dir += 'im_' + net_type + '_'
+		if loss_type == 'hinge':
+			title += 'Hinge Loss'
+		elif loss_type == 'll':
+			title += 'Log-Likelihood Loss'
+		elif loss_type == 'mse':
+			title+= 'Mean Squared Error Loss'
+		elif loss_type == 'humble':
+			title+= 'Humble Teacher Loss'
+			
+		file_dir += loss_type + "_" + str(num_epochs) 
+		
+		if(plot):
+			dir_name = 'plots'
+		else:
+			dir_name = 'csv'
+		
+		try:
+			mkdir(dir_name)
+		except FileExistsError:
+			pass
+		try:
+			mkdir(subdir_name)
+		except FileExistsError:
+			pass
+	
+		# plot or save to .csv
+		if(plot):
+			A = np.array(list_trackers) # nperms x ntype x 4 tracker types x n_iters
+			M = np.mean(A,axis=0) # ntype x 4 tracker types x n_iters
+			SE = sem(A,axis=0) # ntype x 4 tracker types x n_iters		
+			
+			plt.figure(1)
+			for i in range(ntype): 
+				if viz_se:
+					plt.errorbar(M[i,0,:],M[i,1,:],yerr=SE[i,1,:],linewidth=4./(i+1))
+				else:
+					plt.plot(M[i,0,:],M[i,1,:],linewidth=4./(i+1))
+							
+			plt.suptitle(title)
+			plt.xlabel('Block')
+			plt.ylabel('Probability correct')
+			plt.legend(["Type " + str(s) for s in range(1,7)])
+			plt.savefig(file_dir + '1.png')
+			
+			plt.figure(2)
+			for i in range(ntype):
+				if viz_se:
+					plt.errorbar(M[i,0,:],M[i,3,:],yerr=SE[i,3,:],linewidth=4./(i+1))  # v is [tracker type x n_iters]
+				else:
+					plt.plot(M[i,0,:],M[i,3,:],linewidth=4./(i+1))  # v is [tracker type x n_iters]
+			
+			plt.suptitle(title)
+			plt.xlabel('epoch')
+			plt.ylabel('loss')
+			plt.legend(["Type " + str(s) for s in range(1,7)])
+			plt.savefig(file_dir + '2.png')
+			plt.show()
+		else:
+			if(path.isfile(file_dir + '.csv') and not start_over):
+				df.to_csv(file_dir + '.csv',mode='a',header=False)
+			else:
+				df.to_csv(file_dir + '.csv')
+				start_over = False
+	'''
+	
+	# data type = abstract, model = mlp
+	for i, (model_type, image_set, loss_type, num_epochs,
+		 lr_association,lr_attn,phi) in enumerate(configs_ab_mlp):
+		print(f'config {i}: {model_type}, {image_set}, {loss_type} loss, {num_epochs} epochs')
+		data_type = 'abstract'
+		
+		#lr_association = 0.03 # learning rate for association weights
+		#lr_attn = 0.0033 # learning rate for attention weights
+		c = None
+		ntype = 6 # number of types in SHJ
+		viz_se = False # visualize standard error in plot	
+		
+		# counters for proper translation to .csv file
+		type_tracker = 1 
+		num_rows = (num_epochs // track_inc) + 1
+		perm_tracker = 1
+		num_rows_p = num_rows*ntype
+		
+		POSITIVE,NEGATIVE = get_label_coding(loss_type)
+		list_perms = [(0,1,2)]
+		list_exemplars = []
+		for p in list_perms:
+			exemplars,labels_by_type = load_shj_abstract(loss_type,p) 
+				# [n_exemplars x dim tensor],list of [n_exemplars tensor]		
+			list_exemplars.append(exemplars)
+		
+		# initialize DataFrame for translation to .csv
+		epoch_range = list(range(track_inc,num_epochs+1,track_inc))
+		epoch_range.insert(0,1)
+		df = pd.DataFrame(index=range(1,(num_rows)*ntype*len(list_exemplars)+1), 
+					   columns=['Model','Net','Loss Type','Image Set','LR-Attention',
+					'LR-Association','c','phi','Permutation','Type','Epoch','Train Loss',
+					'Train Accuracy','Probability Correct'])
+		df.at[:,'Model'] = model_type
+		df.at[:,'Loss Type'] = loss_type
+		df.at[:,'LR-Attention'] = lr_attn
+		df.at[:,'LR-Association'] = lr_association
+		df.at[:,'Image Set'] = image_set
+		df.at[:,'phi'] = phi
+
+		dim = list_exemplars[0].size(1)
+		print("Data loaded with " + str(dim) + " dimensions.")
+		
+		# Run ALCOVE on each SHJ problem
+		list_trackers = []
+		for pidx,exemplars in enumerate(list_exemplars): # all permutations of stimulus dimensions
+			tracker = []
+			print('Permutation ' + str(pidx))
+			df.at[perm_tracker:perm_tracker+num_rows_p,'Permutation'] = pidx
+			for mytype in range(1,ntype+1): # from type I to type VI
+				print('  Training on type ' + str(mytype))
+				df.at[type_tracker:type_tracker+num_rows,'Type'] = mytype
+				labels = labels_by_type[mytype-1]
+				v_epoch,v_prob,v_acc,v_loss = train(exemplars,labels,num_epochs,loss_type,mytype,c,phi,track_inc)
+				tracker.append((v_epoch,v_prob,v_acc,v_loss))
+				print("")
+				type_tracker += num_rows
+			list_trackers.append(tracker)
+			perm_tracker += num_rows_p
+			
+		# create directories/filenames for plots/.csv files and title for plots
+		title = ''
+		if(plot):
+			file_dir = 'plots/' 
+		else:
+			file_dir = 'csv_test/'
+			
+		file_dir += image_set
+		subdir_name = file_dir
+		
+		file_dir = file_dir + "/" + model_type + "_"
+			
+		title += 'MLP Model: Abstract Stimulus, '
+		file_dir += 'ab_'
+		if loss_type == 'hinge':
+			title += 'Hinge Loss'
+		elif loss_type == 'll':
+			title += 'Log-Likelihood Loss'
+		elif loss_type == 'mse':
+			title+= 'Mean Squared Error Loss'
+		elif loss_type == 'humble':
+			title+= 'Humble Teacher Loss'
+			
+		file_dir += loss_type + "_" + str(num_epochs)
+		
+		if(plot):
+			dir_name = 'plots'
+		else:
+			dir_name = 'csv'
+		
+		try:
+			mkdir(dir_name)
+		except FileExistsError:
+			pass
+		try:
+			mkdir(subdir_name)
+		except FileExistsError:
+			pass
+	
+		# plot or save to .csv
+		if(plot):
+			A = np.array(list_trackers) # nperms x ntype x 4 tracker types x n_iters
+			M = np.mean(A,axis=0) # ntype x 4 tracker types x n_iters
+			SE = sem(A,axis=0) # ntype x 4 tracker types x n_iters		
+			
+			plt.figure(1)
+			for i in range(ntype): 
+				if viz_se:
+					plt.errorbar(M[i,0,:],M[i,1,:],yerr=SE[i,1,:],linewidth=4./(i+1))
+				else:
+					plt.plot(M[i,0,:],M[i,1,:],linewidth=4./(i+1))
+							
+			plt.suptitle(title)
+			plt.xlabel('Block')
+			plt.ylabel('Probability correct')
+			plt.legend(["Type " + str(s) for s in range(1,7)])
+			plt.savefig(file_dir + '1.png')
+			
+			plt.figure(2)
+			for i in range(ntype):
+				if viz_se:
+					plt.errorbar(M[i,0,:],M[i,3,:],yerr=SE[i,3,:],linewidth=4./(i+1))  # v is [tracker type x n_iters]
+				else:
+					plt.plot(M[i,0,:],M[i,3,:],linewidth=4./(i+1))  # v is [tracker type x n_iters]
+			
+			plt.suptitle(title)
+			plt.xlabel('epoch')
+			plt.ylabel('loss')
+			plt.legend(["Type " + str(s) for s in range(1,7)])
+			plt.savefig(file_dir + '2.png')
+			plt.show()
+		else:
+			if(path.isfile(file_dir + '.csv') and not start_over):
+				df.to_csv(file_dir + '.csv',mode='a',header=False)
+			else:
+				df.to_csv(file_dir + '.csv')
+				start_over = False
+		
 		
