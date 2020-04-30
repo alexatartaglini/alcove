@@ -113,6 +113,27 @@ def update_batch(net,exemplars,targets,loss,optimizer):
 		net.attn.data = torch.clamp(net.attn.data, min=0.) # ensure attention is non-negative
 	return myloss.cpu().item()
 
+def update_single(net, exemplars, targets, loss, optimizer):
+	#net.zero_grad()
+	#net.train()
+	
+	n_exemplars = exemplars.size(0)
+	out = torch.zeros(n_exemplars)
+	current_loss = torch.zeros(n_exemplars)
+	for j in range(n_exemplars):
+		net.zero_grad()
+		net.train()
+	
+		out[j],_ = net.forward(exemplars[j])
+		myloss = loss(out[j], targets[j])
+		myloss.backward(retain_graph=True)
+		optimizer.step()
+		current_loss[j] = myloss.cpu().item()
+		if model_type == 'alcove':
+			net.attn.data = torch.clamp(net.attn.data, min=0.) # ensure attention is non-negative
+	return torch.sum(current_loss).item()
+	
+
 def evaluate(net,exemplars,targets):
 	# Compute probability of getting each answer/exemplar right using sigmoid
 	# 
@@ -188,7 +209,7 @@ def train(exemplars,labels,num_epochs,loss_type,typenum,c,phi,track_inc=5,verbos
 	elif loss_type == 'hinge':
 		loss = HingeLoss
 	elif loss_type == 'mse':
-		loss = torch.nn.MSELoss(reduction='mean')
+		loss = torch.nn.MSELoss(reduction='sum')
 	elif loss_type == 'humble':
 		loss = HumbleTeacherLoss
 	else:
@@ -204,6 +225,8 @@ def train(exemplars,labels,num_epochs,loss_type,typenum,c,phi,track_inc=5,verbos
 	v_prob = []
 	for epoch in range(1,num_epochs+1):
 		loss_epoch = update_batch(net,exemplars,labels,loss,optimizer)
+		#loss_epoch = update_single(net,exemplars,labels,loss,optimizer)
+		print(loss_epoch)
 		if epoch == 1 or epoch % track_inc == 0:
 			test_prob,test_acc = evaluate(net,exemplars,labels)
 			v_epoch.append(epoch)
@@ -222,44 +245,42 @@ def train(exemplars,labels,num_epochs,loss_type,typenum,c,phi,track_inc=5,verbos
 		print("Category associations:")
 		print(np.round(net.w.weight.data.numpy(),3))
 
-
 	return v_epoch,v_prob,v_acc,v_loss
 
 if __name__ == "__main__":
 	
+	'''
 	# values for parameters and hyperparameters
 	models_a = ['alcove']
 	models_mlp = ['mlp']
-	datasets = ['shj_images_set1','shj_images_set2','shj_images_set3']
+	#datasets = ['shj_images_set1','shj_images_set2','shj_images_set3']
+	datasets = ['shj_images_set2']
 	datasets_ab = ['abstract']
 	nets = ['resnet18','resnet152','vgg11']
 	losses = ['hinge','ll','mse','humble']
 	epochs = [16, 32, 64, 128]
-	#lr_associations = [0.005, 0.01, 0.015, 0.02, 0.025, 0.03, 0.035, 0.04, 0.045, 0.05]
-	#lr_attns = [0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01]
-	#cs = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 
-	  # 8.0, 8.5, 9.0, 9.5, 10.0]
-	#phis = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0, 
-		 #3.25, 3.5, 3.75, 4.0, 4.25, 4.5, 4.75, 5.0]
-	
+	lr_associations = [0.005, 0.01, 0.025, 0.05, 0.1]
+	lr_attns = [0.001, 0.005, 0.01]
+	cs = [0.5,1.5,3,6]
+	phis = [1.0,2.0,4.0]
 	'''
+	
+
+	models_a = ['alcove']
+	models_mlp = ['mlp']
 	datasets = ['shj_images_set2']
 	datasets_ab = ['abstract']
 	nets = ['resnet18']
 	losses = ['humble']
-	epochs = [50]
-	'''
-	#lr_associations = [0.005,0.01,0.015]
-	#lr_attns = [0.001,0.002,0.003]
-	#cs = [0.5,1.0,1.5]
-	#phis = [0.25,0.5,0.75]
+	epochs = [200]
 	lr_associations = [0.03]
 	lr_attns = [0.0033]
 	cs = [6.5]
-	phis = [2.5]
+	phis = [2]
+
 
 	
-	plot = False # saves plots when true
+	plot = True # saves plots when true
 	start_over = True # overwrites existing csv files (for the first run) when true
 	track_inc = 4 # step size for recording epochs
 	
@@ -277,6 +298,7 @@ if __name__ == "__main__":
 								lr_associations,lr_attns,phis)
 	configs_ab_mlp = itertools.product(models_mlp, datasets_ab, losses, epochs,
 								lr_associations,lr_attns,phis)
+
 	
 	'''
 	# data type = images, model = alcove
@@ -422,7 +444,7 @@ if __name__ == "__main__":
 				df.to_csv(file_dir + '.csv')
 				start_over = False
 	'''
-	
+
 	# data type = abstract, model = alcove
 	for i, (model_type, image_set, loss_type, num_epochs,
 		 lr_association,lr_attn,c,phi) in enumerate(configs_ab_alcove):
@@ -489,7 +511,7 @@ if __name__ == "__main__":
 		if(plot):
 			file_dir = 'plots/' 
 		else:
-			file_dir = 'csv/'
+			file_dir = 'csv_test/'
 			
 		file_dir += image_set
 		subdir_name = file_dir
@@ -513,7 +535,7 @@ if __name__ == "__main__":
 		if(plot):
 			dir_name = 'plots'
 		else:
-			dir_name = 'csv'
+			dir_name = 'csv_test'
 		
 		try:
 			mkdir(dir_name)
@@ -563,7 +585,7 @@ if __name__ == "__main__":
 				df.to_csv(file_dir + '.csv')
 				start_over = False
 				
-				
+		
 	'''
 	# data type = images, model = mlp 
 	for i, (model_type, image_set, net_type, loss_type, num_epochs,
@@ -579,9 +601,9 @@ if __name__ == "__main__":
 		viz_se = False # visualize standard error in plot	
 		
 		# counters for proper translation to .csv file
-		global type_tracker
+		#type_tracker
 		type_tracker = 1 
-		global num_rows 
+		 #num_rows 
 		num_rows = (num_epochs // track_inc) + 1
 		perm_tracker = 1
 		num_rows_p = num_rows*ntype
@@ -634,7 +656,7 @@ if __name__ == "__main__":
 		if(plot):
 			file_dir = 'plots/' 
 		else:
-			file_dir = 'csv/'
+			file_dir = 'csv_log/'
 			
 		file_dir += image_set
 		subdir_name = file_dir
@@ -657,7 +679,7 @@ if __name__ == "__main__":
 		if(plot):
 			dir_name = 'plots'
 		else:
-			dir_name = 'csv'
+			dir_name = 'csv_log'
 		
 		try:
 			mkdir(dir_name)
@@ -706,8 +728,8 @@ if __name__ == "__main__":
 			else:
 				df.to_csv(file_dir + '.csv')
 				start_over = False
-	'''
 	
+
 	# data type = abstract, model = mlp
 	for i, (model_type, image_set, loss_type, num_epochs,
 		 lr_association,lr_attn,phi) in enumerate(configs_ab_mlp):
@@ -773,7 +795,7 @@ if __name__ == "__main__":
 		if(plot):
 			file_dir = 'plots/' 
 		else:
-			file_dir = 'csv/'
+			file_dir = 'csv_log/'
 			
 		file_dir += image_set
 		subdir_name = file_dir
@@ -796,7 +818,7 @@ if __name__ == "__main__":
 		if(plot):
 			dir_name = 'plots'
 		else:
-			dir_name = 'csv'
+			dir_name = 'csv_log'
 		
 		try:
 			mkdir(dir_name)
@@ -845,5 +867,4 @@ if __name__ == "__main__":
 			else:
 				df.to_csv(file_dir + '.csv')
 				start_over = False
-		
-		
+		'''
