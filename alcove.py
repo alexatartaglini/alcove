@@ -248,6 +248,96 @@ def train(exemplars,labels,num_epochs,loss_type,typenum,c,phi,track_inc=5,verbos
 
 	return v_epoch,v_prob,v_acc,v_loss
 
+def initialize_df(track_inc,num_rows,args):
+	# Initializes a DataFrame for translation to .csv
+	
+	num_epochs = args[4]
+	epoch_range = list(range(track_inc,num_epochs+1,track_inc))
+	epoch_range.insert(0,1)
+	df = pd.DataFrame(index=range(1,(num_rows)*ntype*len(list_exemplars)+1), 
+				      columns=['Model','Net','Loss Type','Image Set','LR-Attention',
+				   'LR-Association','c','phi','Permutation','Type','Epoch','Train Loss',
+				   'Train Accuracy','Probability Correct'])
+	df.at[:,'Model'] = args[0]
+	df.at[:,'Image Set'] = args[1]
+	df.at[:,'Net'] = args[2]
+	df.at[:,'Loss Type'] = args[3]
+	df.at[:,'LR-Association'] = args[5]
+	df.at[:,'LR-Attention'] = args[6]
+	df.at[:,'c'] = args[7]
+	df.at[:,'phi'] = args[8]
+	
+	return df
+
+def create_dir(model_type,image_set,net_type,loss_type,_num_epochs,plot):
+	# Creates directory and file names for plot/csv storage
+	if(image_set == 'abstract'):
+		d = 'ab'
+		sub_subdir_name = ''
+	else:
+		d = 'im'
+		sub_subdir_name = f'/{image_set}'
+		
+	if(plot):
+		dir_name = 'plots'
+		subdir_name = f'{dir_name}/{model_type}_{d}'
+		sub_subdir_name = subdir_name + sub_subdir_name
+		file_dir = f'{sub_subdir_name}/{net_type}{loss_type}_{num_epochs}' 
+		title = f'{model_type} model: {d} stimulus_{net_type}{loss_type}'
+	else:
+		dir_name = 'csv'
+		subdir_name = f'{dir_name}/{model_type}_{d}'
+		sub_subdir_name = subdir_name + sub_subdir_name
+		file_dir = f'{sub_subdir_name}/{net_type}{loss_type}_{num_epochs}' 
+		title = None
+		
+	try:
+		mkdir(dir_name)
+	except FileExistsError:
+		pass
+	try:
+		mkdir(subdir_name)
+	except FileExistsError:
+		pass
+	try:
+		mkdir(sub_subdir_name)
+	except FileExistsError:
+		pass
+		
+	return file_dir,title
+
+def create_plot(list_trackers,ntype,title,file_dir):
+	A = np.array(list_trackers) # nperms x ntype x 4 tracker types x n_iters
+	M = np.mean(A,axis=0) # ntype x 4 tracker types x n_iters
+	SE = sem(A,axis=0) # ntype x 4 tracker types x n_iters		
+				
+	plt.figure(1)
+	for i in range(ntype): 
+		if viz_se:
+			plt.errorbar(M[i,0,:],M[i,1,:],yerr=SE[i,1,:],linewidth=4./(i+1))
+		else:
+			plt.plot(M[i,0,:],M[i,1,:],linewidth=4./(i+1))
+								
+	plt.suptitle(title)
+	plt.xlabel('Block')
+	plt.ylabel('Probability correct')
+	plt.legend(["Type " + str(s) for s in range(1,7)])
+	plt.savefig(file_dir + '1.png')
+				
+	plt.figure(2)
+	for i in range(ntype):
+		if viz_se:
+			plt.errorbar(M[i,0,:],M[i,3,:],yerr=SE[i,3,:],linewidth=4./(i+1))  # v is [tracker type x n_iters]
+		else:
+			plt.plot(M[i,0,:],M[i,3,:],linewidth=4./(i+1))  # v is [tracker type x n_iters]
+				
+	plt.suptitle(title)
+	plt.xlabel('epoch')
+	plt.ylabel('loss')
+	plt.legend(["Type " + str(s) for s in range(1,7)])
+	plt.savefig(file_dir + '2.png')
+	plt.show()	
+
 if __name__ == "__main__":
 	
 	parser = argparse.ArgumentParser()
@@ -328,24 +418,7 @@ if __name__ == "__main__":
 		vals = [float(item) for item in args.phi.split(',')]
 		phis = np.arange(vals[0],vals[1]+vals[2],vals[2])
 
-	
-	'''
-	# values for parameters and hyperparameters
-	models_a = ['alcove']
-	models_mlp = ['mlp']
-	#datasets = ['shj_images_set1','shj_images_set2','shj_images_set3']
-	datasets = ['shj_images_set2']
-	datasets_ab = ['abstract']
-	nets = ['resnet18','resnet152','vgg11']
-	losses = ['hinge','ll','mse','humble']
-	epochs = [16, 32, 64, 128]
-	lr_associations = [0.005, 0.01, 0.025, 0.05, 0.1] # default 0.03
-	lr_attns = [0.001, 0.005, 0.01] # default 0.0033
-	cs = [0.5,1.5,3,6] # default 6.5
-	phis = [1.0,2.0,4.0] # default 2
-	'''
-	
-	plot = False # saves plots when true
+	plot = True # saves plots when true
 	start_over = True # overwrites existing csv files (for the first run) when true
 	track_inc = 5 # step size for recording epochs
 	
@@ -376,7 +449,6 @@ if __name__ == "__main__":
 		for i, (model_type, image_set, net_type, loss_type, num_epochs,
 			 lr_association,lr_attn,c,phi) in enumerate(configs_im_alcove):
 			print(f'config {i}: {model_type}, {image_set}, {net_type}, {loss_type} loss, {num_epochs} epochs')
-			data_type = 'images'
 			im_dir = 'data/' + image_set # assuming imagesets in a folder titled data
 				
 			#lr_association = 0.03 # learning rate for association weights
@@ -399,23 +471,10 @@ if __name__ == "__main__":
 				exemplars,labels_by_type = load_shj_images(loss_type,net_type,im_dir,p)
 					# [n_exemplars x dim tensor],list of [n_exemplars tensor]
 				list_exemplars.append(exemplars)
-				
+			
 			# initialize DataFrame for translation to .csv
-			epoch_range = list(range(track_inc,num_epochs+1,track_inc))
-			epoch_range.insert(0,1)
-			df = pd.DataFrame(index=range(1,(num_rows)*ntype*len(list_exemplars)+1), 
-						   columns=['Model','Net','Loss Type','Image Set','LR-Attention',
-						'LR-Association','c','phi','Permutation','Type','Epoch','Train Loss',
-						'Train Accuracy','Probability Correct'])
-			df.at[:,'Model'] = model_type
-			df.at[:,'Net'] = net_type
-			df.at[:,'Loss Type'] = loss_type
-			df.at[:,'LR-Attention'] = lr_attn
-			df.at[:,'LR-Association'] = lr_association
-			df.at[:,'Image Set'] = image_set
-			if(model_type == 'alcove'):
-				df.at[:,'c'] = c
-			df.at[:,'phi'] = phi
+			df = initialize_df(track_inc,num_rows,[model_type, image_set, net_type, 
+				  loss_type, num_epochs,lr_association,lr_attn,c,phi])
 			
 			dim = list_exemplars[0].size(1)
 			print("Data loaded with " + str(dim) + " dimensions.")
@@ -437,77 +496,13 @@ if __name__ == "__main__":
 				list_trackers.append(tracker)
 				perm_tracker += num_rows_p
 				
-			# create directories/filenames for plots/.csv files and title for plots
-			title = ''
-			if(plot):
-				file_dir = 'plots/' 
-			else:
-				file_dir = 'csv/'
-				
-			file_dir += image_set
-			subdir_name = file_dir
-			
-			file_dir = file_dir + "/" + model_type + "_"
-				
-			title += 'ALCOVE Model: Image Stimulus ' + '(' + net_type + '), '
-			file_dir += 'im_' + net_type + '_'
-			if loss_type == 'hinge':
-				title += 'Hinge Loss'
-			elif loss_type == 'll':
-				title += 'Log-Likelihood Loss'
-			elif loss_type == 'mse':
-				title+= 'Mean Squared Error Loss'
-			elif loss_type == 'humble':
-				title+= 'Humble Teacher Loss'
-				
-			file_dir += loss_type + "_" + str(num_epochs) 
-			
-			if(plot):
-				dir_name = 'plots'
-			else:
-				dir_name = 'csv'
-			
-			try:
-				mkdir(dir_name)
-			except FileExistsError:
-				pass
-			try:
-				mkdir(subdir_name)
-			except FileExistsError:
-				pass
+			# create directories/filenames for plots/.csv files and title for plots			
+			file_dir,title = create_dir(model_type,image_set,net_type+'_',loss_type,
+			   num_epochs,plot)
 		
 			# plot or save to .csv
 			if(plot):
-				A = np.array(list_trackers) # nperms x ntype x 4 tracker types x n_iters
-				M = np.mean(A,axis=0) # ntype x 4 tracker types x n_iters
-				SE = sem(A,axis=0) # ntype x 4 tracker types x n_iters		
-				
-				plt.figure(1)
-				for i in range(ntype): 
-					if viz_se:
-						plt.errorbar(M[i,0,:],M[i,1,:],yerr=SE[i,1,:],linewidth=4./(i+1))
-					else:
-						plt.plot(M[i,0,:],M[i,1,:],linewidth=4./(i+1))
-								
-				plt.suptitle(title)
-				plt.xlabel('Block')
-				plt.ylabel('Probability correct')
-				plt.legend(["Type " + str(s) for s in range(1,7)])
-				plt.savefig(file_dir + '1.png')
-				
-				plt.figure(2)
-				for i in range(ntype):
-					if viz_se:
-						plt.errorbar(M[i,0,:],M[i,3,:],yerr=SE[i,3,:],linewidth=4./(i+1))  # v is [tracker type x n_iters]
-					else:
-						plt.plot(M[i,0,:],M[i,3,:],linewidth=4./(i+1))  # v is [tracker type x n_iters]
-				
-				plt.suptitle(title)
-				plt.xlabel('epoch')
-				plt.ylabel('loss')
-				plt.legend(["Type " + str(s) for s in range(1,7)])
-				plt.savefig(file_dir + '2.png')
-				plt.show()
+				create_plot(list_trackers,ntype,title,file_dir)
 			else:
 				if(path.isfile(file_dir + '.csv') and not start_over):
 					df.to_csv(file_dir + '.csv',mode='a',header=False)
@@ -518,7 +513,6 @@ if __name__ == "__main__":
 		for i, (model_type, image_set, loss_type, num_epochs,
 			 lr_association,lr_attn,c,phi) in enumerate(configs_ab_alcove):
 			print(f'config {i}: {model_type}, {image_set}, {loss_type} loss, {num_epochs} epochs')
-			data_type = 'abstract'
 			
 			#lr_association = 0.03 # learning rate for association weights
 			#lr_attn = 0.0033 # learning rate for attention weights
@@ -540,20 +534,8 @@ if __name__ == "__main__":
 				list_exemplars.append(exemplars)
 			
 			# initialize DataFrame for translation to .csv
-			epoch_range = list(range(track_inc,num_epochs+1,track_inc))
-			epoch_range.insert(0,1)
-			df = pd.DataFrame(index=range(1,(num_rows)*ntype*len(list_exemplars)+1), 
-						   columns=['Model','Net','Loss Type','Image Set','LR-Attention',
-						'LR-Association','c','phi','Permutation','Type','Epoch','Train Loss',
-						'Train Accuracy','Probability Correct'])
-			df.at[:,'Model'] = model_type
-			df.at[:,'Loss Type'] = loss_type
-			df.at[:,'LR-Attention'] = lr_attn
-			df.at[:,'LR-Association'] = lr_association
-			df.at[:,'Image Set'] = image_set
-			if(model_type == 'alcove'):
-				df.at[:,'c'] = c
-			df.at[:,'phi'] = phi
+			df = initialize_df(track_inc,num_rows,[model_type, image_set, None, 
+				  loss_type, num_epochs,lr_association,lr_attn,c,phi])
 	
 			dim = list_exemplars[0].size(1)
 			print("Data loaded with " + str(dim) + " dimensions.")
@@ -576,77 +558,12 @@ if __name__ == "__main__":
 				perm_tracker += num_rows_p
 				
 			# create directories/filenames for plots/.csv files and title for plots
-			title = ''
-			if(plot):
-				file_dir = 'plots/' 
-			else:
-				file_dir = 'csv_test/'
-				
-			file_dir += image_set
-			subdir_name = file_dir
-			
-			file_dir = file_dir + "/" + model_type + "_"
-				
-	
-			title += 'ALCOVE Model: Abstract Stimulus, '
-			file_dir += 'ab_'
-			if loss_type == 'hinge':
-				title += 'Hinge Loss'
-			elif loss_type == 'll':
-				title += 'Log-Likelihood Loss'
-			elif loss_type == 'mse':
-				title+= 'Mean Squared Error Loss'
-			elif loss_type == 'humble':
-				title+= 'Humble Teacher Loss'
-				
-			file_dir += loss_type + "_" + str(num_epochs)
-			
-			if(plot):
-				dir_name = 'plots'
-			else:
-				dir_name = 'csv_test'
-			
-			try:
-				mkdir(dir_name)
-			except FileExistsError:
-				pass
-			try:
-				mkdir(subdir_name)
-			except FileExistsError:
-				pass
+			file_dir,title = create_dir(model_type,image_set,'',loss_type,
+			   num_epochs,plot)
 		
 			# plot or save to .csv
 			if(plot):
-				A = np.array(list_trackers) # nperms x ntype x 4 tracker types x n_iters
-				M = np.mean(A,axis=0) # ntype x 4 tracker types x n_iters
-				SE = sem(A,axis=0) # ntype x 4 tracker types x n_iters		
-				
-				plt.figure(1)
-				for i in range(ntype): 
-					if viz_se:
-						plt.errorbar(M[i,0,:],M[i,1,:],yerr=SE[i,1,:],linewidth=4./(i+1))
-					else:
-						plt.plot(M[i,0,:],M[i,1,:],linewidth=4./(i+1))
-								
-				plt.suptitle(title)
-				plt.xlabel('Block')
-				plt.ylabel('Probability correct')
-				plt.legend(["Type " + str(s) for s in range(1,7)])
-				plt.savefig(file_dir + '1.png')
-				
-				plt.figure(2)
-				for i in range(ntype):
-					if viz_se:
-						plt.errorbar(M[i,0,:],M[i,3,:],yerr=SE[i,3,:],linewidth=4./(i+1))  # v is [tracker type x n_iters]
-					else:
-						plt.plot(M[i,0,:],M[i,3,:],linewidth=4./(i+1))  # v is [tracker type x n_iters]
-				
-				plt.suptitle(title)
-				plt.xlabel('epoch')
-				plt.ylabel('loss')
-				plt.legend(["Type " + str(s) for s in range(1,7)])
-				plt.savefig(file_dir + '2.png')
-				plt.show()
+				create_plot(list_trackers,ntype,title,file_dir)
 			else:
 				if(path.isfile(file_dir + '.csv') and not start_over):
 					df.to_csv(file_dir + '.csv',mode='a',header=False)
@@ -657,7 +574,6 @@ if __name__ == "__main__":
 		for i, (model_type, image_set, net_type, loss_type, num_epochs,
 			 lr_association,lr_attn,phi) in enumerate(configs_im_mlp):
 			print(f'config {i}: {model_type}, {image_set}, {net_type}, {loss_type} loss, {num_epochs} epochs')
-			data_type = 'images'
 			im_dir = 'data/' + image_set # assuming imagesets in a folder titled data
 				
 			#lr_association = 0.03 # learning rate for association weights
@@ -683,19 +599,8 @@ if __name__ == "__main__":
 				list_exemplars.append(exemplars)
 				
 			# initialize DataFrame for translation to .csv
-			epoch_range = list(range(track_inc,num_epochs+1,track_inc))
-			epoch_range.insert(0,1)
-			df = pd.DataFrame(index=range(1,(num_rows)*ntype*len(list_exemplars)+1), 
-						   columns=['Model','Net','Loss Type','Image Set','LR-Attention',
-						'LR-Association','c','phi','Permutation','Type','Epoch','Train Loss',
-						'Train Accuracy','Probability Correct'])
-			df.at[:,'Model'] = model_type
-			df.at[:,'Net'] = net_type
-			df.at[:,'Loss Type'] = loss_type
-			df.at[:,'LR-Attention'] = lr_attn
-			df.at[:,'LR-Association'] = lr_association
-			df.at[:,'Image Set'] = image_set
-			df.at[:,'phi'] = phi
+			df = initialize_df(track_inc,num_rows,[model_type, image_set, net_type, 
+				  loss_type, num_epochs,lr_association,lr_attn,None,phi])
 			
 			dim = list_exemplars[0].size(1)
 			print("Data loaded with " + str(dim) + " dimensions.")
@@ -718,76 +623,12 @@ if __name__ == "__main__":
 				perm_tracker += num_rows_p
 				
 			# create directories/filenames for plots/.csv files and title for plots
-			title = ''
-			if(plot):
-				file_dir = 'plots/' 
-			else:
-				file_dir = 'csv_log/'
-				
-			file_dir += image_set
-			subdir_name = file_dir
-			
-			file_dir = file_dir + "/" + model_type + "_"
-				
-			title += 'MLP Model: ' + 'Image Stimulus ' + '(' + net_type + '), '
-			file_dir += 'im_' + net_type + '_'
-			if loss_type == 'hinge':
-				title += 'Hinge Loss'
-			elif loss_type == 'll':
-				title += 'Log-Likelihood Loss'
-			elif loss_type == 'mse':
-				title+= 'Mean Squared Error Loss'
-			elif loss_type == 'humble':
-				title+= 'Humble Teacher Loss'
-				
-			file_dir += loss_type + "_" + str(num_epochs) 
-			
-			if(plot):
-				dir_name = 'plots'
-			else:
-				dir_name = 'csv_log'
-			
-			try:
-				mkdir(dir_name)
-			except FileExistsError:
-				pass
-			try:
-				mkdir(subdir_name)
-			except FileExistsError:
-				pass
+			file_dir,title = create_dir(model_type,image_set,net_type+'_',loss_type,
+			   num_epochs,plot)
 		
 			# plot or save to .csv
 			if(plot):
-				A = np.array(list_trackers) # nperms x ntype x 4 tracker types x n_iters
-				M = np.mean(A,axis=0) # ntype x 4 tracker types x n_iters
-				SE = sem(A,axis=0) # ntype x 4 tracker types x n_iters		
-				
-				plt.figure(1)
-				for i in range(ntype): 
-					if viz_se:
-						plt.errorbar(M[i,0,:],M[i,1,:],yerr=SE[i,1,:],linewidth=4./(i+1))
-					else:
-						plt.plot(M[i,0,:],M[i,1,:],linewidth=4./(i+1))
-								
-				plt.suptitle(title)
-				plt.xlabel('Block')
-				plt.ylabel('Probability correct')
-				plt.legend(["Type " + str(s) for s in range(1,7)])
-				plt.savefig(file_dir + '1.png')
-				
-				plt.figure(2)
-				for i in range(ntype):
-					if viz_se:
-						plt.errorbar(M[i,0,:],M[i,3,:],yerr=SE[i,3,:],linewidth=4./(i+1))  # v is [tracker type x n_iters]
-					else:
-						plt.plot(M[i,0,:],M[i,3,:],linewidth=4./(i+1))  # v is [tracker type x n_iters]
-				
-				plt.suptitle(title)
-				plt.xlabel('epoch')
-				plt.ylabel('loss')
-				plt.legend(["Type " + str(s) for s in range(1,7)])
-				plt.savefig(file_dir + '2.png')
-				plt.show()
+				create_plot(list_trackers,ntype,title,file_dir)
 			else:
 				if(path.isfile(file_dir + '.csv') and not start_over):
 					df.to_csv(file_dir + '.csv',mode='a',header=False)
@@ -798,7 +639,6 @@ if __name__ == "__main__":
 		for i, (model_type, image_set, loss_type, num_epochs,
 			 lr_association,lr_attn,phi) in enumerate(configs_ab_mlp):
 			print(f'config {i}: {model_type}, {image_set}, {loss_type} loss, {num_epochs} epochs')
-			data_type = 'abstract'
 			
 			#lr_association = 0.03 # learning rate for association weights
 			#lr_attn = 0.0033 # learning rate for attention weights
@@ -821,18 +661,8 @@ if __name__ == "__main__":
 				list_exemplars.append(exemplars)
 			
 			# initialize DataFrame for translation to .csv
-			epoch_range = list(range(track_inc,num_epochs+1,track_inc))
-			epoch_range.insert(0,1)
-			df = pd.DataFrame(index=range(1,(num_rows)*ntype*len(list_exemplars)+1), 
-						   columns=['Model','Net','Loss Type','Image Set','LR-Attention',
-						'LR-Association','c','phi','Permutation','Type','Epoch','Train Loss',
-						'Train Accuracy','Probability Correct'])
-			df.at[:,'Model'] = model_type
-			df.at[:,'Loss Type'] = loss_type
-			df.at[:,'LR-Attention'] = lr_attn
-			df.at[:,'LR-Association'] = lr_association
-			df.at[:,'Image Set'] = image_set
-			df.at[:,'phi'] = phi
+			df = initialize_df(track_inc,num_rows,[model_type, image_set, None, 
+				  loss_type, num_epochs,lr_association,lr_attn,None,phi])
 	
 			dim = list_exemplars[0].size(1)
 			print("Data loaded with " + str(dim) + " dimensions.")
@@ -855,76 +685,12 @@ if __name__ == "__main__":
 				perm_tracker += num_rows_p
 				
 			# create directories/filenames for plots/.csv files and title for plots
-			title = ''
-			if(plot):
-				file_dir = 'plots/' 
-			else:
-				file_dir = 'csv_log/'
-				
-			file_dir += image_set
-			subdir_name = file_dir
-			
-			file_dir = file_dir + "/" + model_type + "_"
-				
-			title += 'MLP Model: Abstract Stimulus, '
-			file_dir += 'ab_'
-			if loss_type == 'hinge':
-				title += 'Hinge Loss'
-			elif loss_type == 'll':
-				title += 'Log-Likelihood Loss'
-			elif loss_type == 'mse':
-				title+= 'Mean Squared Error Loss'
-			elif loss_type == 'humble':
-				title+= 'Humble Teacher Loss'
-				
-			file_dir += loss_type + "_" + str(num_epochs)
-			
-			if(plot):
-				dir_name = 'plots'
-			else:
-				dir_name = 'csv_log'
-			
-			try:
-				mkdir(dir_name)
-			except FileExistsError:
-				pass
-			try:
-				mkdir(subdir_name)
-			except FileExistsError:
-				pass
+			file_dir,title = create_dir(model_type,image_set,'',loss_type,
+			   num_epochs,plot)
 		
 			# plot or save to .csv
 			if(plot):
-				A = np.array(list_trackers) # nperms x ntype x 4 tracker types x n_iters
-				M = np.mean(A,axis=0) # ntype x 4 tracker types x n_iters
-				SE = sem(A,axis=0) # ntype x 4 tracker types x n_iters		
-				
-				plt.figure(1)
-				for i in range(ntype): 
-					if viz_se:
-						plt.errorbar(M[i,0,:],M[i,1,:],yerr=SE[i,1,:],linewidth=4./(i+1))
-					else:
-						plt.plot(M[i,0,:],M[i,1,:],linewidth=4./(i+1))
-								
-				plt.suptitle(title)
-				plt.xlabel('Block')
-				plt.ylabel('Probability correct')
-				plt.legend(["Type " + str(s) for s in range(1,7)])
-				plt.savefig(file_dir + '1.png')
-				
-				plt.figure(2)
-				for i in range(ntype):
-					if viz_se:
-						plt.errorbar(M[i,0,:],M[i,3,:],yerr=SE[i,3,:],linewidth=4./(i+1))  # v is [tracker type x n_iters]
-					else:
-						plt.plot(M[i,0,:],M[i,3,:],linewidth=4./(i+1))  # v is [tracker type x n_iters]
-				
-				plt.suptitle(title)
-				plt.xlabel('epoch')
-				plt.ylabel('loss')
-				plt.legend(["Type " + str(s) for s in range(1,7)])
-				plt.savefig(file_dir + '2.png')
-				plt.show()
+				create_plot(list_trackers,ntype,title,file_dir)
 			else:
 				if(path.isfile(file_dir + '.csv') and not start_over):
 					df.to_csv(file_dir + '.csv',mode='a',header=False)
