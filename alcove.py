@@ -287,8 +287,7 @@ def create_dir(model_type,image_set,net_type,loss_type,_num_epochs,plot):
 	else:
 		dir_name = 'csv'
 		subdir_name = f'{dir_name}/{model_type}_{d}'
-		sub_subdir_name = subdir_name + sub_subdir_name
-		file_dir = f'{sub_subdir_name}/{net_type}{loss_type}_{num_epochs}' 
+		file_dir = f'{subdir_name}/{net_type}{loss_type}_{num_epochs}' 
 		title = None
 		
 	try:
@@ -362,25 +361,33 @@ if __name__ == "__main__":
 					 type=str)
 	parser.add_argument("--phi_list",help="Explicitly specify values for phi. Comma delimited",
 					 type=str)
+	parser.add_argument("--all",help="Run all model-net-loss or model-loss configurations",
+					 action="store_true")
 	
 	args = parser.parse_args()
 	
-	if(args.model is None):
-		model = ['alcove']
+	
+	if(args.all):
+		model = ['alcove','mlp']
+		net = ['resnet18','resnet152','vgg11']
+		loss = ['humble','hinge','ll','mse']
 	else:
-		model = [args.model]
+		if(args.model is None):
+			model = ['alcove']
+		else:
+			model = [args.model]
+		if(args.net is None):
+			net = ['resnet18']
+		else:
+			net = args.net
+		if(args.loss is None):
+			loss = ['humble']
+		else:
+			loss = [args.loss]
 	if(args.dataset is None):
 		dataset = ['abstract']
 	else:
 		dataset = [args.dataset]
-	if(args.net is None):
-		net = ['resnet18']
-	else:
-		net = args.net
-	if(args.loss is None):
-		loss = ['humble']
-	else:
-		loss = [args.loss]
 	if(args.epochs is None):
 		epochs = [50,100,150]
 	else:
@@ -418,7 +425,7 @@ if __name__ == "__main__":
 		vals = [float(item) for item in args.phi.split(',')]
 		phis = np.arange(vals[0],vals[1]+vals[2],vals[2])
 
-	plot = True # saves plots when true
+	plot = False # saves plots when true
 	start_over = True # overwrites existing csv files (for the first run) when true
 	track_inc = 5 # step size for recording epochs
 	
@@ -429,23 +436,17 @@ if __name__ == "__main__":
 		pass
 	
 	# create configurations
-	if(dataset[0] != 'abstract'):
-		if(model[0] == 'mlp'):
-			configs_im_mlp = itertools.product(model, dataset, net, loss, epochs,
-							lr_associations,lr_attns,phis)
-		else:
-			configs_im_alcove = itertools.product(model, dataset, net, loss, epochs,
-							lr_associations,lr_attns,cs,phis)
-	else:
-		if(model[0] == 'mlp'):
-			configs_ab_mlp = itertools.product(model, dataset, loss, epochs,
-							lr_associations,lr_attns,phis)
-		else:
-			configs_ab_alcove = itertools.product(model, dataset, loss, epochs,
-							lr_associations,lr_attns,cs,phis)
+	configs_im_mlp = itertools.product(model, dataset, net, loss, epochs,
+									lr_associations,lr_attns,phis)
+	configs_im_alcove = itertools.product(model, dataset, net, loss, epochs,
+								    lr_associations,lr_attns,cs,phis)
+	configs_ab_mlp = itertools.product(model, dataset, loss, epochs,
+									lr_associations,lr_attns,phis)
+	configs_ab_alcove = itertools.product(model, dataset, loss, epochs,
+								    lr_associations,lr_attns,cs,phis)
 			
 
-	if(model[0] == 'alcove' and dataset[0] != 'abstract'): # data type = images, model = alcove
+	if('alcove' in model and dataset[0] != 'abstract'): # data type = images, model = alcove
 		for i, (model_type, image_set, net_type, loss_type, num_epochs,
 			 lr_association,lr_attn,c,phi) in enumerate(configs_im_alcove):
 			print(f'config {i}: {model_type}, {image_set}, {net_type}, {loss_type} loss, {num_epochs} epochs')
@@ -479,6 +480,7 @@ if __name__ == "__main__":
 			dim = list_exemplars[0].size(1)
 			print("Data loaded with " + str(dim) + " dimensions.")
 			
+			
 			# Run ALCOVE on each SHJ problem
 			list_trackers = []
 			for pidx,exemplars in enumerate(list_exemplars): # all permutations of stimulus dimensions
@@ -509,7 +511,7 @@ if __name__ == "__main__":
 				else:
 					df.to_csv(file_dir + '.csv')
 					start_over = False
-	elif(model[0] == 'alcove' and dataset[0] == 'abstract'):
+	if('alcove' in model and dataset[0] == 'abstract'):
 		for i, (model_type, image_set, loss_type, num_epochs,
 			 lr_association,lr_attn,c,phi) in enumerate(configs_ab_alcove):
 			print(f'config {i}: {model_type}, {image_set}, {loss_type} loss, {num_epochs} epochs')
@@ -526,13 +528,13 @@ if __name__ == "__main__":
 			num_rows_p = num_rows*ntype
 			
 			POSITIVE,NEGATIVE = get_label_coding(loss_type)
-			list_perms = [(0,1,2)]
+			list_perms = list(permutations([0,1,2]))
 			list_exemplars = []
 			for p in list_perms:
 				exemplars,labels_by_type = load_shj_abstract(loss_type,p) 
 					# [n_exemplars x dim tensor],list of [n_exemplars tensor]		
 				list_exemplars.append(exemplars)
-			
+
 			# initialize DataFrame for translation to .csv
 			df = initialize_df(track_inc,num_rows,[model_type, image_set, None, 
 				  loss_type, num_epochs,lr_association,lr_attn,c,phi])
@@ -570,7 +572,7 @@ if __name__ == "__main__":
 				else:
 					df.to_csv(file_dir + '.csv')
 					start_over = False
-	elif(model[0] == 'mlp' and dataset[0] != 'abstract'): # data type = images, model = mlp 
+	if('mlp' in model and dataset[0] != 'abstract'): # data type = images, model = mlp 
 		for i, (model_type, image_set, net_type, loss_type, num_epochs,
 			 lr_association,lr_attn,phi) in enumerate(configs_im_mlp):
 			print(f'config {i}: {model_type}, {image_set}, {net_type}, {loss_type} loss, {num_epochs} epochs')
@@ -635,7 +637,7 @@ if __name__ == "__main__":
 				else:
 					df.to_csv(file_dir + '.csv')
 					start_over = False
-	elif(model[0] == 'mlp' and dataset[0] == 'abstract'): 	# data type = abstract, model = mlp
+	if('mlp' in model and dataset[0] == 'abstract'): 	# data type = abstract, model = mlp
 		for i, (model_type, image_set, loss_type, num_epochs,
 			 lr_association,lr_attn,phi) in enumerate(configs_ab_mlp):
 			print(f'config {i}: {model_type}, {image_set}, {loss_type} loss, {num_epochs} epochs')
@@ -653,7 +655,7 @@ if __name__ == "__main__":
 			num_rows_p = num_rows*ntype
 			
 			POSITIVE,NEGATIVE = get_label_coding(loss_type)
-			list_perms = [(0,1,2)]
+			list_perms = list_perms = list(permutations([0,1,2]))
 			list_exemplars = []
 			for p in list_perms:
 				exemplars,labels_by_type = load_shj_abstract(loss_type,p) 
