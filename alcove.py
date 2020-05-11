@@ -298,10 +298,11 @@ def create_dir(model_type,image_set,net_type,loss_type,_num_epochs,plot):
 		mkdir(subdir_name)
 	except FileExistsError:
 		pass
-	try:
-		mkdir(sub_subdir_name)
-	except FileExistsError:
-		pass
+	if(plot):
+		try:
+			mkdir(sub_subdir_name)
+		except FileExistsError:
+			pass
 		
 	return file_dir,title
 
@@ -426,7 +427,7 @@ if __name__ == "__main__":
 		phis = np.arange(vals[0],vals[1]+vals[2],vals[2])
 
 	plot = False # saves plots when true
-	start_over = True # overwrites existing csv files (for the first run) when true
+	start_over = False # overwrites existing csv files (for the first run) when true
 	track_inc = 5 # step size for recording epochs
 	
 	# create directory for extracted features 
