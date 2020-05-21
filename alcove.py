@@ -7,6 +7,7 @@ from itertools import permutations
 from data_loader import get_label_coding,load_shj_abstract,load_shj_images
 from scipy.stats import sem
 from os import mkdir, path
+import os
 import pandas as pd
 import itertools
 import argparse
@@ -256,7 +257,7 @@ def initialize_df(track_inc,num_rows,args):
 	epoch_range.insert(0,1)
 	df = pd.DataFrame(index=range(1,(num_rows)*ntype*len(list_exemplars)+1), 
 				      columns=['Model','Net','Loss Type','Image Set','LR-Attention',
-				   'LR-Association','c','phi','Permutation','Type','Epoch','Train Loss',
+				   'LR-Association','c','phi','Permutation','Type','Epoch','Max Epochs','Train Loss',
 				   'Train Accuracy','Probability Correct'])
 	df.at[:,'Model'] = args[0]
 	df.at[:,'Image Set'] = args[1]
@@ -336,9 +337,11 @@ def create_plot(list_trackers,ntype,title,file_dir):
 	plt.ylabel('loss')
 	plt.legend(["Type " + str(s) for s in range(1,7)])
 	plt.savefig(file_dir + '2.png')
-	plt.show()	
+	plt.show()
 
 if __name__ == "__main__":
+	
+	os.environ['KMP_DUPLICATE_LIB_OK']='True'
 	
 	parser = argparse.ArgumentParser()
 	parser.add_argument("-m","--model" ,help="Model (alcove or mlp)",type=str)
@@ -369,8 +372,10 @@ if __name__ == "__main__":
 	
 	
 	if(args.all):
-		model = ['alcove','mlp']
-		net = ['resnet18','resnet152','vgg11']
+		#model = ['alcove','mlp']
+		model = ['alcove']
+		#net = ['resnet18','resnet152','vgg11']
+		net = ['resnet152','vgg11']
 		loss = ['humble','hinge','ll','mse']
 	else:
 		if(args.model is None):
@@ -380,7 +385,7 @@ if __name__ == "__main__":
 		if(args.net is None):
 			net = ['resnet18']
 		else:
-			net = args.net
+			net = [args.net]
 		if(args.loss is None):
 			loss = ['humble']
 		else:
@@ -390,7 +395,7 @@ if __name__ == "__main__":
 	else:
 		dataset = [args.dataset]
 	if(args.epochs is None):
-		epochs = [50,100,150]
+		epochs = [16]
 	else:
 		epochs = [int(item) for item in args.epochs.split(',')]
 	if(args.lr_assoc is None):
@@ -481,7 +486,6 @@ if __name__ == "__main__":
 			dim = list_exemplars[0].size(1)
 			print("Data loaded with " + str(dim) + " dimensions.")
 			
-			
 			# Run ALCOVE on each SHJ problem
 			list_trackers = []
 			for pidx,exemplars in enumerate(list_exemplars): # all permutations of stimulus dimensions
@@ -491,6 +495,7 @@ if __name__ == "__main__":
 				for mytype in range(1,ntype+1): # from type I to type VI
 					print('  Training on type ' + str(mytype))
 					df.at[type_tracker:type_tracker+num_rows,'Type'] = mytype
+					df.at[type_tracker:type_tracker+num_rows,'Max Epochs'] = num_epochs
 					labels = labels_by_type[mytype-1]
 					v_epoch,v_prob,v_acc,v_loss = train(exemplars,labels,num_epochs,loss_type,mytype,c,phi,track_inc)
 					tracker.append((v_epoch,v_prob,v_acc,v_loss))
@@ -507,6 +512,8 @@ if __name__ == "__main__":
 			if(plot):
 				create_plot(list_trackers,ntype,title,file_dir)
 			else:
+				convert_dict = {'Max Epochs':int}
+				df = df.astype(convert_dict)        
 				if(path.isfile(file_dir + '.csv') and not start_over):
 					df.to_csv(file_dir + '.csv',mode='a',header=False)
 				else:
@@ -568,6 +575,8 @@ if __name__ == "__main__":
 			if(plot):
 				create_plot(list_trackers,ntype,title,file_dir)
 			else:
+				convert_dict = {'Max Epochs':int}
+				df = df.astype(convert_dict)        
 				if(path.isfile(file_dir + '.csv') and not start_over):
 					df.to_csv(file_dir + '.csv',mode='a',header=False)
 				else:
@@ -633,6 +642,8 @@ if __name__ == "__main__":
 			if(plot):
 				create_plot(list_trackers,ntype,title,file_dir)
 			else:
+				convert_dict = {'Max Epochs':int}
+				df = df.astype(convert_dict)        
 				if(path.isfile(file_dir + '.csv') and not start_over):
 					df.to_csv(file_dir + '.csv',mode='a',header=False)
 				else:
@@ -695,6 +706,8 @@ if __name__ == "__main__":
 			if(plot):
 				create_plot(list_trackers,ntype,title,file_dir)
 			else:
+				convert_dict = {'Max Epochs':int}
+				df = df.astype(convert_dict)        
 				if(path.isfile(file_dir + '.csv') and not start_over):
 					df.to_csv(file_dir + '.csv',mode='a',header=False)
 				else:
