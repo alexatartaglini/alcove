@@ -118,6 +118,7 @@ def update_batch(net,exemplars,targets,loss,optimizer):
 def update_single(net, exemplars, targets, loss, optimizer):
 	#net.zero_grad()
 	#net.train()
+	torch.autograd.set_detect_anomaly(True)
 	
 	n_exemplars = exemplars.size(0)
 	out = torch.zeros(n_exemplars)
@@ -372,10 +373,9 @@ if __name__ == "__main__":
 	
 	
 	if(args.all):
-		#model = ['alcove','mlp']
-		model = ['alcove']
-		#net = ['resnet18','resnet152','vgg11']
-		net = ['resnet152','vgg11']
+		#model = ['alcove']
+		model = ['mlp']
+		net = ['resnet18','resnet152','vgg11']
 		loss = ['humble','hinge','ll','mse']
 	else:
 		if(args.model is None):
@@ -559,6 +559,7 @@ if __name__ == "__main__":
 				for mytype in range(1,ntype+1): # from type I to type VI
 					print('  Training on type ' + str(mytype))
 					df.at[type_tracker:type_tracker+num_rows,'Type'] = mytype
+					df.at[type_tracker:type_tracker+num_rows,'Max Epochs'] = num_epochs
 					labels = labels_by_type[mytype-1]
 					v_epoch,v_prob,v_acc,v_loss = train(exemplars,labels,num_epochs,loss_type,mytype,c,phi,track_inc)
 					tracker.append((v_epoch,v_prob,v_acc,v_loss))
@@ -626,6 +627,7 @@ if __name__ == "__main__":
 				for mytype in range(1,ntype+1): # from type I to type VI
 					print('  Training on type ' + str(mytype))
 					df.at[type_tracker:type_tracker+num_rows,'Type'] = mytype
+					df.at[type_tracker:type_tracker+num_rows,'Max Epochs'] = num_epochs
 					labels = labels_by_type[mytype-1]
 					v_epoch,v_prob,v_acc,v_loss = train(exemplars,labels,num_epochs,loss_type,mytype,c,phi,track_inc)
 					tracker.append((v_epoch,v_prob,v_acc,v_loss))
@@ -690,6 +692,7 @@ if __name__ == "__main__":
 				for mytype in range(1,ntype+1): # from type I to type VI
 					print('  Training on type ' + str(mytype))
 					df.at[type_tracker:type_tracker+num_rows,'Type'] = mytype
+					df.at[type_tracker:type_tracker+num_rows,'Max Epochs'] = num_epochs
 					labels = labels_by_type[mytype-1]
 					v_epoch,v_prob,v_acc,v_loss = train(exemplars,labels,num_epochs,loss_type,mytype,c,phi,track_inc)
 					tracker.append((v_epoch,v_prob,v_acc,v_loss))
