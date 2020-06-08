@@ -9,7 +9,6 @@ from scipy.stats import sem
 from os import mkdir, path
 import os
 import pandas as pd
-import itertools
 import argparse
 
 #
@@ -344,376 +343,288 @@ if __name__ == "__main__":
 	
 	os.environ['KMP_DUPLICATE_LIB_OK']='True'
 	
+	# create argparse arguments for simulation parameters
 	parser = argparse.ArgumentParser()
-	parser.add_argument("-m","--model" ,help="Model (alcove or mlp)",type=str)
-	parser.add_argument("-d","--dataset",help="Dataset (shj_images_set1, abstract, etc)",type=str)
-	parser.add_argument("-n","--net",help="Net type (resnet18, resnet152, vgg11",type=str)
-	parser.add_argument("-l","--loss",help="Loss (hinge, ll, mse, humble)",type=str)
-	parser.add_argument("-e","--epochs",help="List of # Epochs. Comma delimited",type=str)
-	parser.add_argument("--lr_assoc",help="Evenly spaced range of lr_assoc values. Enter: start,end,step",
-					 type=str)
-	parser.add_argument("--lr_assoc_list",help="Explicitly specify values for lr_assoc. Comma delimited",
-					 type=str)
-	parser.add_argument("--lr_attn",help="Evenly spaced range of lr_attn values. Enter: start,end,step",
-					 type=str)
-	parser.add_argument("--lr_attn_list",help="Explicitly specify values for lr_attn. Comma delimited",
-					 type=str)
-	parser.add_argument("--c",help="Evenly spaced range of c values. Enter: start,end,step",
-					 type=str)
-	parser.add_argument("--c_list",help="Explicitly specify values for c. Comma delimited",
-					 type=str)
-	parser.add_argument("--phi",help="Evenly spaced range of phi values. Enter: start,end,step",
-					 type=str)
-	parser.add_argument("--phi_list",help="Explicitly specify values for phi. Comma delimited",
-					 type=str)
-	parser.add_argument("--all",help="Run all model-net-loss or model-loss configurations",
-					 action="store_true")
+	parser.add_argument("-m","--model" ,help="Model (alcove or mlp)",type=str,default='alcove')
+	parser.add_argument("-d","--dataset",help="Dataset (shj_images_set1, abstract, etc)",type=str,default='shj_images_set1')
+	parser.add_argument("-n","--net",help="Net type (resnet18, resnet152, vgg11",type=str,default='resnet18')
+	parser.add_argument("-l","--loss",help="Loss (hinge, ll, mse, humble)",type=str,default='humble')
+	parser.add_argument("-e","--epochs",help="# Epochs (default 128)",type=int,default=128)
+	parser.add_argument("--lr_assoc",help="Learning rate - association (default 0.03)",type=float,default=0.03)
+	parser.add_argument("--lr_attn",help="Learning rate - attention (default 0.0033)",type=float,default=0.0033)
+	parser.add_argument("--c",help="c hyperparameter(default 6.5)",type=float,default=6.5)
+	parser.add_argument("--phi",help="phi hyperparameter (default 2.0)",type=float,default=2.0)
 	
 	args = parser.parse_args()
 	
-	
-	if(args.all):
-		#model = ['alcove']
-		model = ['mlp']
-		net = ['resnet18','resnet152','vgg11']
-		loss = ['humble','hinge','ll','mse']
-	else:
-		if(args.model is None):
-			model = ['alcove']
-		else:
-			model = [args.model]
-		if(args.net is None):
-			net = ['resnet18']
-		else:
-			net = [args.net]
-		if(args.loss is None):
-			loss = ['humble']
-		else:
-			loss = [args.loss]
-	if(args.dataset is None):
-		dataset = ['abstract']
-	else:
-		dataset = [args.dataset]
-	if(args.epochs is None):
-		epochs = [16]
-	else:
-		epochs = [int(item) for item in args.epochs.split(',')]
-	if(args.lr_assoc is None):
-		if(args.lr_assoc_list is None):
-			lr_associations = [0.03]
-		else:
-			lr_associations = [float(item) for item in args.lr_assoc_list.split(',')]
-	else:
-		vals = [float(item) for item in args.lr_assoc.split(',')]
-		lr_associations = np.arange(vals[0],vals[1]+vals[2],vals[2])
-	if(args.lr_attn is None):
-		if(args.lr_attn_list is None):
-			lr_attns = [0.0033]
-		else:
-			lr_attns = [float(item) for item in args.lr_attn_list.split(',')]
-	else:
-		vals = [float(item) for item in args.lr_attn.split(',')]
-		lr_attns = np.arange(vals[0],vals[1]+vals[2],vals[2])
-	if(args.c is None):
-		if(args.c_list is None):
-			cs = [6.5]
-		else:
-			cs = [float(item) for item in args.c_list.split(',')]
-	else:
-		vals = [float(item) for item in args.c.split(',')]
-		cs = np.arange(vals[0],vals[1]+vals[2],vals[2])
-	if(args.phi is None):
-		if(args.phi_list is None):
-			phis = [2]
-		else:
-			phis = [float(item) for item in args.phi_list.split(',')]
-	else:
-		vals = [float(item) for item in args.phi.split(',')]
-		phis = np.arange(vals[0],vals[1]+vals[2],vals[2])
+	model_type = args.model
+	image_set = args.dataset
+	net_type = args.net
+	loss_type = args.loss
+	num_epochs = args.epochs
+	lr_association = args.lr_assoc
+	lr_attn = args.lr_attn
+	c = args.c
+	phi = args.phi
 
+	# options for output of results
 	plot = False # saves plots when true
-	start_over = False # overwrites existing csv files (for the first run) when true
-	track_inc = 5 # step size for recording epochs
+	track_inc = 1 # step size for recording epochs
 	
 	# create directory for extracted features 
 	try:
 		mkdir('pickle')
 	except FileExistsError:
 		pass
-	
-	# create configurations
-	configs_im_mlp = itertools.product(model, dataset, net, loss, epochs,
-									lr_associations,lr_attns,phis)
-	configs_im_alcove = itertools.product(model, dataset, net, loss, epochs,
-								    lr_associations,lr_attns,cs,phis)
-	configs_ab_mlp = itertools.product(model, dataset, loss, epochs,
-									lr_associations,lr_attns,phis)
-	configs_ab_alcove = itertools.product(model, dataset, loss, epochs,
-								    lr_associations,lr_attns,cs,phis)
-			
 
-	if('alcove' in model and dataset[0] != 'abstract'): # data type = images, model = alcove
-		for i, (model_type, image_set, net_type, loss_type, num_epochs,
-			 lr_association,lr_attn,c,phi) in enumerate(configs_im_alcove):
-			print(f'config {i}: {model_type}, {image_set}, {net_type}, {loss_type} loss, {num_epochs} epochs')
-			im_dir = 'data/' + image_set # assuming imagesets in a folder titled data
-				
-			#lr_association = 0.03 # learning rate for association weights
-			#lr_attn = 0.0033 # learning rate for attention weights
-			ntype = 6 # number of types in SHJ
-			viz_se = False # visualize standard error in plot	
-			
-			# counters for proper translation to .csv file
-			global type_tracker
-			type_tracker = 1 
-			global num_rows 
-			num_rows = (num_epochs // track_inc) + 1
-			perm_tracker = 1
-			num_rows_p = num_rows*ntype
-			
-			POSITIVE,NEGATIVE = get_label_coding(loss_type)
-			list_perms = list(permutations([0,1,2])) # ways of assigning abstract dimensions to visual ones
-			list_exemplars = []
-			for p in list_perms:
-				exemplars,labels_by_type = load_shj_images(loss_type,net_type,im_dir,p)
-					# [n_exemplars x dim tensor],list of [n_exemplars tensor]
-				list_exemplars.append(exemplars)
-			
-			# initialize DataFrame for translation to .csv
-			df = initialize_df(track_inc,num_rows,[model_type, image_set, net_type, 
-				  loss_type, num_epochs,lr_association,lr_attn,c,phi])
-			
-			dim = list_exemplars[0].size(1)
-			print("Data loaded with " + str(dim) + " dimensions.")
-			
-			# Run ALCOVE on each SHJ problem
-			list_trackers = []
-			for pidx,exemplars in enumerate(list_exemplars): # all permutations of stimulus dimensions
-				tracker = []
-				print('Permutation ' + str(pidx))
-				df.at[perm_tracker:perm_tracker+num_rows_p,'Permutation'] = pidx
-				for mytype in range(1,ntype+1): # from type I to type VI
-					print('  Training on type ' + str(mytype))
-					df.at[type_tracker:type_tracker+num_rows,'Type'] = mytype
-					df.at[type_tracker:type_tracker+num_rows,'Max Epochs'] = num_epochs
-					labels = labels_by_type[mytype-1]
-					v_epoch,v_prob,v_acc,v_loss = train(exemplars,labels,num_epochs,loss_type,mytype,c,phi,track_inc)
-					tracker.append((v_epoch,v_prob,v_acc,v_loss))
-					print("")
-					type_tracker += num_rows
-				list_trackers.append(tracker)
-				perm_tracker += num_rows_p
-				
-			# create directories/filenames for plots/.csv files and title for plots			
-			file_dir,title = create_dir(model_type,image_set,net_type+'_',loss_type,
-			   num_epochs,plot)
-		
-			# plot or save to .csv
-			if(plot):
-				create_plot(list_trackers,ntype,title,file_dir)
-			else:
-				convert_dict = {'Max Epochs':int}
-				df = df.astype(convert_dict)        
-				if(path.isfile(file_dir + '.csv') and not start_over):
-					df.to_csv(file_dir + '.csv',mode='a',header=False)
-				else:
-					df.to_csv(file_dir + '.csv')
-					start_over = False
-	if('alcove' in model and dataset[0] == 'abstract'):
-		for i, (model_type, image_set, loss_type, num_epochs,
-			 lr_association,lr_attn,c,phi) in enumerate(configs_ab_alcove):
-			print(f'config {i}: {model_type}, {image_set}, {loss_type} loss, {num_epochs} epochs')
-			
-			#lr_association = 0.03 # learning rate for association weights
-			#lr_attn = 0.0033 # learning rate for attention weights
-			ntype = 6 # number of types in SHJ
-			viz_se = False # visualize standard error in plot	
-			
-			# counters for proper translation to .csv file
-			type_tracker = 1 
-			num_rows = (num_epochs // track_inc) + 1
-			perm_tracker = 1
-			num_rows_p = num_rows*ntype
-			
-			POSITIVE,NEGATIVE = get_label_coding(loss_type)
-			list_perms = list(permutations([0,1,2]))
-			list_exemplars = []
-			for p in list_perms:
-				exemplars,labels_by_type = load_shj_abstract(loss_type,p) 
-					# [n_exemplars x dim tensor],list of [n_exemplars tensor]		
-				list_exemplars.append(exemplars)
+	im_dir = 'data/' + image_set # assuming imagesets in a folder titled data
 
-			# initialize DataFrame for translation to .csv
-			df = initialize_df(track_inc,num_rows,[model_type, image_set, None, 
-				  loss_type, num_epochs,lr_association,lr_attn,c,phi])
-	
-			dim = list_exemplars[0].size(1)
-			print("Data loaded with " + str(dim) + " dimensions.")
+	# run simulation
+	if(model == 'alcove' and dataset != 'abstract'): # data type = images, model = alcove
+		print(f'config: {model_type}, {image_set}, {net_type}, {loss_type} loss, {num_epochs} epochs')
 			
-			# Run ALCOVE on each SHJ problem
-			list_trackers = []
-			for pidx,exemplars in enumerate(list_exemplars): # all permutations of stimulus dimensions
-				tracker = []
-				print('Permutation ' + str(pidx))
-				df.at[perm_tracker:perm_tracker+num_rows_p,'Permutation'] = pidx
-				for mytype in range(1,ntype+1): # from type I to type VI
-					print('  Training on type ' + str(mytype))
-					df.at[type_tracker:type_tracker+num_rows,'Type'] = mytype
-					df.at[type_tracker:type_tracker+num_rows,'Max Epochs'] = num_epochs
-					labels = labels_by_type[mytype-1]
-					v_epoch,v_prob,v_acc,v_loss = train(exemplars,labels,num_epochs,loss_type,mytype,c,phi,track_inc)
-					tracker.append((v_epoch,v_prob,v_acc,v_loss))
-					print("")
-					type_tracker += num_rows
-				list_trackers.append(tracker)
-				perm_tracker += num_rows_p
-				
-			# create directories/filenames for plots/.csv files and title for plots
-			file_dir,title = create_dir(model_type,image_set,'',loss_type,
-			   num_epochs,plot)
+		ntype = 6 # number of types in SHJ
+		viz_se = False # visualize standard error in plot	
 		
-			# plot or save to .csv
-			if(plot):
-				create_plot(list_trackers,ntype,title,file_dir)
+		# counters for proper translation to .csv file
+		global type_tracker
+		type_tracker = 1 
+		global num_rows 
+		num_rows = (num_epochs // track_inc) + 1
+		perm_tracker = 1
+		num_rows_p = num_rows*ntype
+		
+		POSITIVE,NEGATIVE = get_label_coding(loss_type)
+		list_perms = list(permutations([0,1,2])) # ways of assigning abstract dimensions to visual ones
+		list_exemplars = []
+		for p in list_perms:
+			exemplars,labels_by_type = load_shj_images(loss_type,net_type,im_dir,p)
+				# [n_exemplars x dim tensor],list of [n_exemplars tensor]
+			list_exemplars.append(exemplars)
+		
+		# initialize DataFrame for translation to .csv
+		df = initialize_df(track_inc,num_rows,[model_type, image_set, net_type, 
+			  loss_type, num_epochs,lr_association,lr_attn,c,phi])
+		
+		dim = list_exemplars[0].size(1)
+		print("Data loaded with " + str(dim) + " dimensions.")
+		
+		# Run ALCOVE on each SHJ problem
+		list_trackers = []
+		for pidx,exemplars in enumerate(list_exemplars): # all permutations of stimulus dimensions
+			tracker = []
+			print('Permutation ' + str(pidx))
+			df.at[perm_tracker:perm_tracker+num_rows_p,'Permutation'] = pidx
+			for mytype in range(1,ntype+1): # from type I to type VI
+				print('  Training on type ' + str(mytype))
+				df.at[type_tracker:type_tracker+num_rows,'Type'] = mytype
+				df.at[type_tracker:type_tracker+num_rows,'Max Epochs'] = num_epochs
+				labels = labels_by_type[mytype-1]
+				v_epoch,v_prob,v_acc,v_loss = train(exemplars,labels,num_epochs,loss_type,mytype,c,phi,track_inc)
+				tracker.append((v_epoch,v_prob,v_acc,v_loss))
+				print("")
+				type_tracker += num_rows
+			list_trackers.append(tracker)
+			perm_tracker += num_rows_p
+			
+		# create directories/filenames for plots/.csv files and title for plots			
+		file_dir,title = create_dir(model_type,image_set,net_type+'_',loss_type,
+		   num_epochs,plot)
+	
+		# plot or save to .csv
+		if(plot):
+			create_plot(list_trackers,ntype,title,file_dir)
+		else:
+			convert_dict = {'Max Epochs':int}
+			df = df.astype(convert_dict)        
+			if(path.isfile(file_dir + '.csv')):
+				df.to_csv(file_dir + '.csv',mode='a',header=False)
 			else:
-				convert_dict = {'Max Epochs':int}
-				df = df.astype(convert_dict)        
-				if(path.isfile(file_dir + '.csv') and not start_over):
-					df.to_csv(file_dir + '.csv',mode='a',header=False)
-				else:
-					df.to_csv(file_dir + '.csv')
-					start_over = False
-	if('mlp' in model and dataset[0] != 'abstract'): # data type = images, model = mlp 
+				df.to_csv(file_dir + '.csv')
+					
+	elif(model == 'alcove'): # data type = abstract, model = alcove
+		print(f'config: {model_type}, {image_set}, {loss_type} loss, {num_epochs} epochs')
+		
+		ntype = 6 # number of types in SHJ
+		viz_se = False # visualize standard error in plot	
+		
+		# counters for proper translation to .csv file
+		type_tracker = 1 
+		num_rows = (num_epochs // track_inc) + 1
+		perm_tracker = 1
+		num_rows_p = num_rows*ntype
+		
+		POSITIVE,NEGATIVE = get_label_coding(loss_type)
+		list_perms = list(permutations([0,1,2]))
+		list_exemplars = []
+		for p in list_perms:
+			exemplars,labels_by_type = load_shj_abstract(loss_type,p) 
+				# [n_exemplars x dim tensor],list of [n_exemplars tensor]		
+			list_exemplars.append(exemplars)
+
+		# initialize DataFrame for translation to .csv
+		df = initialize_df(track_inc,num_rows,[model_type, image_set, None, 
+			  loss_type, num_epochs,lr_association,lr_attn,c,phi])
+
+		dim = list_exemplars[0].size(1)
+		print("Data loaded with " + str(dim) + " dimensions.")
+		
+		# Run ALCOVE on each SHJ problem
+		list_trackers = []
+		for pidx,exemplars in enumerate(list_exemplars): # all permutations of stimulus dimensions
+			tracker = []
+			print('Permutation ' + str(pidx))
+			df.at[perm_tracker:perm_tracker+num_rows_p,'Permutation'] = pidx
+			for mytype in range(1,ntype+1): # from type I to type VI
+				print('  Training on type ' + str(mytype))
+				df.at[type_tracker:type_tracker+num_rows,'Type'] = mytype
+				df.at[type_tracker:type_tracker+num_rows,'Max Epochs'] = num_epochs
+				labels = labels_by_type[mytype-1]
+				v_epoch,v_prob,v_acc,v_loss = train(exemplars,labels,num_epochs,loss_type,mytype,c,phi,track_inc)
+				tracker.append((v_epoch,v_prob,v_acc,v_loss))
+				print("")
+				type_tracker += num_rows
+			list_trackers.append(tracker)
+			perm_tracker += num_rows_p
+			
+		# create directories/filenames for plots/.csv files and title for plots
+		file_dir,title = create_dir(model_type,image_set,'',loss_type,
+		   num_epochs,plot)
+	
+		# plot or save to .csv
+		if(plot):
+			create_plot(list_trackers,ntype,title,file_dir)
+		else:
+			convert_dict = {'Max Epochs':int}
+			df = df.astype(convert_dict)        
+			if(path.isfile(file_dir + '.csv')):
+				df.to_csv(file_dir + '.csv',mode='a',header=False)
+			else:
+				df.to_csv(file_dir + '.csv')
+				
+	elif(model == 'mlp' and dataset != 'abstract'): # data type = images, model = mlp 
 		for i, (model_type, image_set, net_type, loss_type, num_epochs,
 			 lr_association,lr_attn,phi) in enumerate(configs_im_mlp):
-			print(f'config {i}: {model_type}, {image_set}, {net_type}, {loss_type} loss, {num_epochs} epochs')
-			im_dir = 'data/' + image_set # assuming imagesets in a folder titled data
-				
-			#lr_association = 0.03 # learning rate for association weights
-			#lr_attn = 0.0033 # learning rate for attention weights
-			c = None
-			ntype = 6 # number of types in SHJ
-			viz_se = False # visualize standard error in plot	
-			
-			# counters for proper translation to .csv file
-			#type_tracker
-			type_tracker = 1 
-			 #num_rows 
-			num_rows = (num_epochs // track_inc) + 1
-			perm_tracker = 1
-			num_rows_p = num_rows*ntype
-			
-			POSITIVE,NEGATIVE = get_label_coding(loss_type)
-			list_perms = list(permutations([0,1,2])) # ways of assigning abstract dimensions to visual ones
-			list_exemplars = []
-			for p in list_perms:
-				exemplars,labels_by_type = load_shj_images(loss_type,net_type,im_dir,p)
-					# [n_exemplars x dim tensor],list of [n_exemplars tensor]
-				list_exemplars.append(exemplars)
-				
-			# initialize DataFrame for translation to .csv
-			df = initialize_df(track_inc,num_rows,[model_type, image_set, net_type, 
-				  loss_type, num_epochs,lr_association,lr_attn,None,phi])
-			
-			dim = list_exemplars[0].size(1)
-			print("Data loaded with " + str(dim) + " dimensions.")
-			
-			# Run ALCOVE on each SHJ problem
-			list_trackers = []
-			for pidx,exemplars in enumerate(list_exemplars): # all permutations of stimulus dimensions
-				tracker = []
-				print('Permutation ' + str(pidx))
-				df.at[perm_tracker:perm_tracker+num_rows_p,'Permutation'] = pidx
-				for mytype in range(1,ntype+1): # from type I to type VI
-					print('  Training on type ' + str(mytype))
-					df.at[type_tracker:type_tracker+num_rows,'Type'] = mytype
-					df.at[type_tracker:type_tracker+num_rows,'Max Epochs'] = num_epochs
-					labels = labels_by_type[mytype-1]
-					v_epoch,v_prob,v_acc,v_loss = train(exemplars,labels,num_epochs,loss_type,mytype,c,phi,track_inc)
-					tracker.append((v_epoch,v_prob,v_acc,v_loss))
-					print("")
-					type_tracker += num_rows
-				list_trackers.append(tracker)
-				perm_tracker += num_rows_p
-				
-			# create directories/filenames for plots/.csv files and title for plots
-			file_dir,title = create_dir(model_type,image_set,net_type+'_',loss_type,
-			   num_epochs,plot)
+		print(f'config: {model_type}, {image_set}, {net_type}, {loss_type} loss, {num_epochs} epochs')
+
+		c = None
+		ntype = 6 # number of types in SHJ
+		viz_se = False # visualize standard error in plot	
 		
-			# plot or save to .csv
-			if(plot):
-				create_plot(list_trackers,ntype,title,file_dir)
-			else:
-				convert_dict = {'Max Epochs':int}
-				df = df.astype(convert_dict)        
-				if(path.isfile(file_dir + '.csv') and not start_over):
-					df.to_csv(file_dir + '.csv',mode='a',header=False)
-				else:
-					df.to_csv(file_dir + '.csv')
-					start_over = False
-	if('mlp' in model and dataset[0] == 'abstract'): 	# data type = abstract, model = mlp
-		for i, (model_type, image_set, loss_type, num_epochs,
-			 lr_association,lr_attn,phi) in enumerate(configs_ab_mlp):
-			print(f'config {i}: {model_type}, {image_set}, {loss_type} loss, {num_epochs} epochs')
+		# counters for proper translation to .csv file
+		#type_tracker
+		type_tracker = 1 
+		 #num_rows 
+		num_rows = (num_epochs // track_inc) + 1
+		perm_tracker = 1
+		num_rows_p = num_rows*ntype
+		
+		POSITIVE,NEGATIVE = get_label_coding(loss_type)
+		list_perms = list(permutations([0,1,2])) # ways of assigning abstract dimensions to visual ones
+		list_exemplars = []
+		for p in list_perms:
+			exemplars,labels_by_type = load_shj_images(loss_type,net_type,im_dir,p)
+				# [n_exemplars x dim tensor],list of [n_exemplars tensor]
+			list_exemplars.append(exemplars)
 			
-			#lr_association = 0.03 # learning rate for association weights
-			#lr_attn = 0.0033 # learning rate for attention weights
-			c = None
-			ntype = 6 # number of types in SHJ
-			viz_se = False # visualize standard error in plot	
+		# initialize DataFrame for translation to .csv
+		df = initialize_df(track_inc,num_rows,[model_type, image_set, net_type, 
+			  loss_type, num_epochs,lr_association,lr_attn,None,phi])
+		
+		dim = list_exemplars[0].size(1)
+		print("Data loaded with " + str(dim) + " dimensions.")
+		
+		# Run ALCOVE on each SHJ problem
+		list_trackers = []
+		for pidx,exemplars in enumerate(list_exemplars): # all permutations of stimulus dimensions
+			tracker = []
+			print('Permutation ' + str(pidx))
+			df.at[perm_tracker:perm_tracker+num_rows_p,'Permutation'] = pidx
+			for mytype in range(1,ntype+1): # from type I to type VI
+				print('  Training on type ' + str(mytype))
+				df.at[type_tracker:type_tracker+num_rows,'Type'] = mytype
+				df.at[type_tracker:type_tracker+num_rows,'Max Epochs'] = num_epochs
+				labels = labels_by_type[mytype-1]
+				v_epoch,v_prob,v_acc,v_loss = train(exemplars,labels,num_epochs,loss_type,mytype,c,phi,track_inc)
+				tracker.append((v_epoch,v_prob,v_acc,v_loss))
+				print("")
+				type_tracker += num_rows
+			list_trackers.append(tracker)
+			perm_tracker += num_rows_p
 			
-			# counters for proper translation to .csv file
-			type_tracker = 1 
-			num_rows = (num_epochs // track_inc) + 1
-			perm_tracker = 1
-			num_rows_p = num_rows*ntype
-			
-			POSITIVE,NEGATIVE = get_label_coding(loss_type)
-			list_perms = list_perms = list(permutations([0,1,2]))
-			list_exemplars = []
-			for p in list_perms:
-				exemplars,labels_by_type = load_shj_abstract(loss_type,p) 
-					# [n_exemplars x dim tensor],list of [n_exemplars tensor]		
-				list_exemplars.append(exemplars)
-			
-			# initialize DataFrame for translation to .csv
-			df = initialize_df(track_inc,num_rows,[model_type, image_set, None, 
-				  loss_type, num_epochs,lr_association,lr_attn,None,phi])
+		# create directories/filenames for plots/.csv files and title for plots
+		file_dir,title = create_dir(model_type,image_set,net_type+'_',loss_type,
+		   num_epochs,plot)
 	
-			dim = list_exemplars[0].size(1)
-			print("Data loaded with " + str(dim) + " dimensions.")
-			
-			# Run ALCOVE on each SHJ problem
-			list_trackers = []
-			for pidx,exemplars in enumerate(list_exemplars): # all permutations of stimulus dimensions
-				tracker = []
-				print('Permutation ' + str(pidx))
-				df.at[perm_tracker:perm_tracker+num_rows_p,'Permutation'] = pidx
-				for mytype in range(1,ntype+1): # from type I to type VI
-					print('  Training on type ' + str(mytype))
-					df.at[type_tracker:type_tracker+num_rows,'Type'] = mytype
-					df.at[type_tracker:type_tracker+num_rows,'Max Epochs'] = num_epochs
-					labels = labels_by_type[mytype-1]
-					v_epoch,v_prob,v_acc,v_loss = train(exemplars,labels,num_epochs,loss_type,mytype,c,phi,track_inc)
-					tracker.append((v_epoch,v_prob,v_acc,v_loss))
-					print("")
-					type_tracker += num_rows
-				list_trackers.append(tracker)
-				perm_tracker += num_rows_p
-				
-			# create directories/filenames for plots/.csv files and title for plots
-			file_dir,title = create_dir(model_type,image_set,'',loss_type,
-			   num_epochs,plot)
-		
-			# plot or save to .csv
-			if(plot):
-				create_plot(list_trackers,ntype,title,file_dir)
+		# plot or save to .csv
+		if(plot):
+			create_plot(list_trackers,ntype,title,file_dir)
+		else:
+			convert_dict = {'Max Epochs':int}
+			df = df.astype(convert_dict)        
+			if(path.isfile(file_dir + '.csv')):
+				df.to_csv(file_dir + '.csv',mode='a',header=False)
 			else:
-				convert_dict = {'Max Epochs':int}
-				df = df.astype(convert_dict)        
-				if(path.isfile(file_dir + '.csv') and not start_over):
-					df.to_csv(file_dir + '.csv',mode='a',header=False)
-				else:
-					df.to_csv(file_dir + '.csv')
-					start_over = False
+				df.to_csv(file_dir + '.csv')
+				
+	else: 	# data type = abstract, model = mlp
+		print(f'config: {model_type}, {image_set}, {loss_type} loss, {num_epochs} epochs')
+		
+		c = None
+		ntype = 6 # number of types in SHJ
+		viz_se = False # visualize standard error in plot	
+		
+		# counters for proper translation to .csv file
+		type_tracker = 1 
+		num_rows = (num_epochs // track_inc) + 1
+		perm_tracker = 1
+		num_rows_p = num_rows*ntype
+		
+		POSITIVE,NEGATIVE = get_label_coding(loss_type)
+		list_perms = list_perms = list(permutations([0,1,2]))
+		list_exemplars = []
+		for p in list_perms:
+			exemplars,labels_by_type = load_shj_abstract(loss_type,p) 
+				# [n_exemplars x dim tensor],list of [n_exemplars tensor]		
+			list_exemplars.append(exemplars)
+		
+		# initialize DataFrame for translation to .csv
+		df = initialize_df(track_inc,num_rows,[model_type, image_set, None, 
+			  loss_type, num_epochs,lr_association,lr_attn,None,phi])
+
+		dim = list_exemplars[0].size(1)
+		print("Data loaded with " + str(dim) + " dimensions.")
+		
+		# Run ALCOVE on each SHJ problem
+		list_trackers = []
+		for pidx,exemplars in enumerate(list_exemplars): # all permutations of stimulus dimensions
+			tracker = []
+			print('Permutation ' + str(pidx))
+			df.at[perm_tracker:perm_tracker+num_rows_p,'Permutation'] = pidx
+			for mytype in range(1,ntype+1): # from type I to type VI
+				print('  Training on type ' + str(mytype))
+				df.at[type_tracker:type_tracker+num_rows,'Type'] = mytype
+				df.at[type_tracker:type_tracker+num_rows,'Max Epochs'] = num_epochs
+				labels = labels_by_type[mytype-1]
+				v_epoch,v_prob,v_acc,v_loss = train(exemplars,labels,num_epochs,loss_type,mytype,c,phi,track_inc)
+				tracker.append((v_epoch,v_prob,v_acc,v_loss))
+				print("")
+				type_tracker += num_rows
+			list_trackers.append(tracker)
+			perm_tracker += num_rows_p
+			
+		# create directories/filenames for plots/.csv files and title for plots
+		file_dir,title = create_dir(model_type,image_set,'',loss_type,
+		   num_epochs,plot)
+	
+		# plot or save to .csv
+		if(plot):
+			create_plot(list_trackers,ntype,title,file_dir)
+		else:
+			convert_dict = {'Max Epochs':int}
+			df = df.astype(convert_dict)        
+			if(path.isfile(file_dir + '.csv')):
+				df.to_csv(file_dir + '.csv',mode='a',header=False)
+			else:
+				df.to_csv(file_dir + '.csv')
 
