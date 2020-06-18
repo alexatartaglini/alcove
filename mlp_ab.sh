@@ -11,16 +11,13 @@ for lr_assoc in "${lr_assoc_vals[@]}"
 do
 	for lr_attn in "${lr_attn_vals[@]}"
 	do
-		for c in "${c_vals[@]}"
+		for phi in "${phi_vals[@]}"
 		do
-			for phi in "${phi_vals[@]}"
+			for dataset in "${datasets[@]}"
 			do
-				for dataset in "${datasets[@]}"
+				for loss in "${losses[@]}"
 				do
-					for loss in "${losses[@]}"
-					do
-						python alcove.py -m 'mlp' --lr_assoc $lr_assoc --lr_attn $lr_attn --phi $phi -d $dataset -l $loss -e $epochs
-					done
+					python alcove.py -m 'mlp' --lr_assoc $lr_assoc --lr_attn $lr_attn --phi $phi -d $dataset -l $loss -e $epochs
 				done
 			done
 		done
