@@ -1,7 +1,7 @@
 #!/bin/bash
 
 models=('resnet18' 'resnet152' 'vgg11')
-lr_assoc_vals=(0.2 0.3 0.4 0.5)
+lr_assoc_vals=(0.02 0.03 0.04 0.05)
 lr_attn_vals=(0.0013 0.0023 0.0033 0.0043)
 phi_vals=(2.0 2.5)
 datasets=('shj_images_set1')

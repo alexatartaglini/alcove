@@ -1,6 +1,6 @@
 #!/bin/bash
 
-lr_assoc_vals=(0.3)
+lr_assoc_vals=(0.03)
 lr_attn_vals=(0.0033)
 phi_vals=(2.0 2.5)
 datasets=('abstract')
