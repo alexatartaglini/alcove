@@ -86,7 +86,7 @@ def process_shj_images(net_type, im_dir):
 		outfile = open(pickle_dir_im, 'wb')
 		pickle.dump(images, outfile)
 		outfile.close()
-		
+	
 	X = torch.tensor(stimuli).float()
 	return X,images
 

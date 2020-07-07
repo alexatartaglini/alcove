@@ -1,9 +1,9 @@
 #!/bin/bash
 
-lr_assoc_vals=(0.02 0.03 0.04 0.05)
-lr_attn_vals=(0.0013 0.0023 0.0033 0.0043)
-c_vals=(6.0 6.5)
-phi_vals=(2.0 2.5)
+lr_assoc_vals=(0.03)
+lr_attn_vals=(0.0033)
+c_vals=(6.5)
+phi_vals=(2.5)
 datasets=('abstract')
 losses=('hinge' 'humble' 'mse' 'll')
 epochs=128
