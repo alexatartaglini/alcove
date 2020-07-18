@@ -403,7 +403,8 @@ def run_simulation(model_type,image_set,net_type,loss_type,num_epochs,lr_associa
 		create_plot(list_trackers,ntype,title,file_dir)
 	else:      
 		if(path.isfile(file_dir + '.csv')):
-			df.to_csv(file_dir + '.csv',mode='a',header=False)
+			with open(file_dir + '.csv', 'a') as csv:
+				df.to_csv(csv, header=False)
 		else:
 			df.to_csv(file_dir + '.csv')
 
