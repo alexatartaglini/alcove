@@ -342,6 +342,74 @@ def create_plot(list_trackers,ntype,title,file_dir):
 	plt.savefig(file_dir + '2.png')
 	plt.show()
 	
+def trapezoidal_integral(f, a = 0, b = 128, step = 1):
+	# Calculates an approximate integral from x=a to x=b 
+	# using the trapezoidal rule. 
+	#
+	# Input
+	#	f: list of y values/datapoints corresponding to range x=(a,b)
+	#	a: starting point/epoch (usually 0) 
+	#	b: ending point/epoch (usually 128)
+	#	step: step size between points/epochs (usually 1)
+	#
+	# Output
+	#	trapezoidal approximation of integral	
+	
+	n = (b - a) / step
+	delta_x = (b - a) / n
+	mul = delta_x / 2
+	
+	b -= 1 # for index purposes
+	t = f[a] + f[b]
+	
+	for i in range(1,b):
+		t += (f[i] * 2)
+		
+	return t * mul
+
+def average_integral(df, track):
+	# Calculates the average approximate integral over permutations.
+	
+	perms = [0,1,2,3,4,5]
+	average = 0
+
+	for perm in perms:
+		this_df = df.loc[df['Permutation'] == perm]
+		
+		f = this_df['Probability Correct'].tolist()
+		integral = trapezoidal_integral(f, step=track)
+		
+		average += integral
+		
+	return average / len(perms)
+
+def df_to_integral(df, track_inc):
+	# Calculates average integrals from dataframe. Saves
+	# in csv file (titled integrals.csv)
+	
+	if(df.at[1,'Net'].astype(str) == 'nan'):
+		df['Net'] = 'NaN'
+	if(df.at[1,'c'].astype(str) == 'nan'):
+		df['c'] = 'NaN'
+
+	args = ['Model', 'Net', 'Loss Type', 'Image Set', 'LR-Attention', 'LR-Association',
+							 'c','phi','Type']
+	
+	integrals = df.groupby(args).apply(average_integral,track=track_inc).reset_index(name='Average Integral')
+	
+	integral_dir = 'csv/integrals/integrals.csv'
+	
+	try:
+		mkdir('csv/integrals')
+	except FileExistsError:
+		pass
+	
+	if path.isfile(integral_dir):
+		with open(integral_dir, 'a') as csv:
+			integrals.to_csv(csv, header=False)
+	else:
+		integrals.to_csv(integral_dir)
+	
 def run_simulation(model_type,image_set,net_type,loss_type,num_epochs,lr_association,lr_attn,c,phi,
 				   track_inc,plot):
 	im_dir = 'data/' + image_set # assuming imagesets in a folder titled data
@@ -407,7 +475,10 @@ def run_simulation(model_type,image_set,net_type,loss_type,num_epochs,lr_associa
 				df.to_csv(csv, header=False)
 		else:
 			df.to_csv(file_dir + '.csv')
-
+	
+	# Calculate and store average integrals for this setting
+	df_to_integral(df, track_inc)
+	
 if __name__ == "__main__":
 	
 	os.environ['KMP_DUPLICATE_LIB_OK']='True'
@@ -453,7 +524,7 @@ if __name__ == "__main__":
 	print(f'config: {model_type}, {image_set}, {net_type}, {loss_type} loss, {num_epochs} epochs')
 
 	# run simulation
-	if(model_type == 'alcove' and image_set != 'abstract'): # data type = images, model = alcove	
+	if(model_type == 'alcove' and image_set != 'abstract'): # data type = images, model = alcove
 		run_simulation(model_type,image_set,net_type,loss_type,num_epochs,lr_association,lr_attn,c,phi,
 				 track_inc,plot)
 					
