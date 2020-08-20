@@ -387,16 +387,15 @@ def df_to_integral(df, track_inc):
 	# Calculates average integrals from dataframe. Saves
 	# in csv file (titled integrals.csv)
 	
-	if(df.at[1,'Net'].astype(str) == 'nan'):
+	if(df.at[1,'Net'] == 'nan' or df.at[1,'Net'] is None):
 		df['Net'] = 'NaN'
-	if(df.at[1,'c'].astype(str) == 'nan'):
+	if(df.at[1,'c'] == 'nan' or df.at[1,'c'] is None):
 		df['c'] = 'NaN'
 
 	args = ['Model', 'Net', 'Loss Type', 'Image Set', 'LR-Attention', 'LR-Association',
 							 'c','phi','Type']
 	
 	integrals = df.groupby(args).apply(average_integral,track=track_inc).reset_index(name='Average Integral')
-	
 	integral_dir = 'csv/integrals/integrals.csv'
 	
 	try:
@@ -471,7 +470,7 @@ def run_simulation(model_type,image_set,net_type,loss_type,num_epochs,lr_associa
 		create_plot(list_trackers,ntype,title,file_dir)
 	else:      
 		if(path.isfile(file_dir + '.csv')):
-			with open(file_dir + '.csv', 'a') as csv:
+			with open(file_dir + '.csv', 'a', newline='\n') as csv:
 				df.to_csv(csv, header=False)
 		else:
 			df.to_csv(file_dir + '.csv')
